@@ -271,12 +271,14 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
         when CBOR_BStr {
             my $bytes = read-uint;
             my $buf = $cbor.subbuf($pos, $bytes);
+            fail "Byte string too short" unless $buf.bytes == $bytes;
             $pos += $bytes;
             $buf
         }
         when CBOR_TStr {
             my $bytes = read-uint;
             my $utf8  = $cbor.subbuf($pos, $bytes);
+            fail "Text string too short" unless $utf8.bytes == $bytes;
             $pos += $bytes;
             $utf8.decode
         }
