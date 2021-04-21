@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 45;
+plan 51;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -107,13 +107,20 @@ matches -4.1e0, 'fbc010666666666666';
 # matches NaN, 'f97e00';
 # matches -Inf, 'f9fc00';
 
-matches Inf, 'fa7f800000';
-# matches NaN, 'fa7fc00000';  # NaN produces 64-bit output
-matches -Inf, 'faff800000';
+# Current state: NaN produces 64-bit output, ±‭Inf produces 32-bit output
+# XXXX: This isn't ideal (both should produce 16-bit output), but it's not
+#       *wrong*, so for now just prevent regression.
+encodes-to  Inf, 'fa7f800000';
+encodes-to  NaN, 'fb7ff8000000000000';
+encodes-to -Inf, 'faff800000';
 
-# matches Inf, 'fb7ff0000000000000';  # Inf produces 32-bit output
-matches NaN, 'fb7ff8000000000000';
-# matches -Inf, 'fbfff0000000000000';  # -Inf produces 32-bit output
+decodes-to  Inf, 'fa7f800000';
+decodes-to  NaN, 'fa7fc00000';
+decodes-to -Inf, 'faff800000';
+
+decodes-to  Inf, 'fb7ff0000000000000';
+decodes-to  NaN, 'fb7ff8000000000000';
+decodes-to -Inf, 'fbfff0000000000000';
 
 
 # SIMPLE VALUES
