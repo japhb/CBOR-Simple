@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 52;
+plan 54;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -136,6 +136,12 @@ matches Mu,    'f7';
 
 
 # XXXX: Known tags
+
+
+# BINARY BUFFERS
+
+matches buf8.new,          '40';
+matches buf8.new(1,2,3,4), '4401020304';
 
 
 # STRINGS
