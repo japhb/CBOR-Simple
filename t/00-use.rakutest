@@ -1,0 +1,11 @@
+use v6.d;
+use Test;
+
+
+use CBOR::Simple;
+
+
+pass "all modules loaded successfully";
+
+
+done-testing;
