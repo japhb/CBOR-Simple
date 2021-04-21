@@ -158,9 +158,19 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 $pos += 8;
             }
         }
-        when DateTime {
+        when Instant {
+            my $num = .to-posix[0].Num;
+            my $val = $num.Int == $num ?? $num.Int !! $num;
+
             $buf.write-uint8($pos++, CBOR_Tag + 1);
-            cbor-encode(.Num, $pos, $buf);
+            cbor-encode($val, $pos, $buf);
+        }
+        when DateTime {
+            my $num = .Instant.to-posix[0].Num;
+            my $val = $num.Int == $num ?? $num.Int !! $num;
+
+            $buf.write-uint8($pos++, CBOR_Tag + 1);
+            cbor-encode($val, $pos, $buf);
         }
         when Dateish {
             $buf.write-uint8($pos++, CBOR_Tag);  # + 0

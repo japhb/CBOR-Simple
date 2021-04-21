@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 54;
+plan 57;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -132,6 +132,10 @@ matches Mu,    'f7';
 
 
 # XXXX: Known tags
+decodes-to DateTime.new("2013-03-21T20:04:00Z"),
+           'c074323031332d30332d32315432303a30343a30305a';
+matches DateTime.new(1363896240),   'c11a514b67b0';
+matches DateTime.new(1363896240.5), 'c1fb41d452d9ec200000';
 
 
 # BINARY BUFFERS
