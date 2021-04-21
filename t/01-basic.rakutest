@@ -1,0 +1,131 @@
+use v6.d;
+use Test;
+
+use CBOR::Simple;
+
+plan 43;
+
+
+multi matches(Mu $value, Str:D $cbor) {
+    matches($value, buf8.new($cbor.comb(2).map(*.parse-base(16))))
+}
+
+multi matches(Mu $value, Buf:D $cbor) {
+    subtest "$value.raku() handled correctly", {
+        my $as-cbor  = cbor-encode($value);
+        my $as-value = cbor-decode($cbor);
+
+        is-deeply $as-cbor,  $cbor,  "cbor-encode produces correct blob";
+        is-deeply $as-value, $value, "cbor-decode produces correct value" if $value  ~~ Any;
+        is        $as-value, Mu,     "cbor-decode produces correct value" if $value !~~ Any;
+    }
+}
+
+
+### Below adapted from https://tools.ietf.org/html/rfc8949#appendix-A
+
+# INTEGERS
+
+matches 0, '00';
+matches 1, '01';
+matches 10, '0a';
+matches 23, '17';
+matches 24, '1818';
+matches 25, '1819';
+matches 100, '1864';
+matches 1000, '1903e8';
+matches 1000000, '1a000f4240';
+matches 1000000000000, '1b000000e8d4a51000';
+matches 18446744073709551615, '1bffffffffffffffff';
+matches -18446744073709551616, '3bffffffffffffffff';
+
+# XXXX: Requires fixes to CBOR_Tag
+# matches 18446744073709551616, 'c249010000000000000000';
+# matches -18446744073709551617, 'c349010000000000000000';
+
+matches -1, '20';
+matches -10, '29';
+matches -100, '3863';
+matches -1000, '3903e7';
+
+
+# FLOATS
+
+# XXXX: Requires 16-bit nums
+# matches 0.0e0, 'f90000';
+# matches -0.0e0, 'f98000';
+# matches 1.0e0, 'f93c00';
+# matches 1.5e0, 'f93e00';
+# matches 65504e0, 'f97bff';
+
+matches 1.1e0, 'fb3ff199999999999a';
+matches 100000e0, 'fa47c35000';
+matches 3.4028234663852886e+38, 'fa7f7fffff';
+matches 1.0e+300, 'fb7e37e43c8800759c';
+matches -4.1e0, 'fbc010666666666666';
+
+# XXXX: Requires 16-bit nums
+# matches 5.960464477539063e-8, 'f90001';
+# matches 0.00006103515625e0, 'f90400';
+# matches -4.0e0, 'f9c400';
+# matches Inf, 'f97c00';
+# matches NaN, 'f97e00';
+# matches -Inf, 'f9fc00';
+
+matches Inf, 'fa7f800000';
+# matches NaN, 'fa7fc00000';  # NaN produces 64-bit output
+matches -Inf, 'faff800000';
+
+# matches Inf, 'fb7ff0000000000000';  # Inf produces 32-bit output
+matches NaN, 'fb7ff8000000000000';
+# matches -Inf, 'fbfff0000000000000';  # -Inf produces 32-bit output
+
+
+# SIMPLE VALUES
+
+matches False, 'f4';
+matches True, 'f5';
+matches Any, 'f6';
+matches Mu, 'f7';
+
+# XXXX: Other simples
+
+
+# XXXX: Known tags
+
+
+# STRINGS
+
+matches "", '60';
+matches "a", '6161';
+matches "IETF", '6449455446';
+matches "\"\\", '62225c';
+matches "\x00fc", '62c3bc';
+matches "\x6c34", '63e6b0b4';
+
+# XXXX: Error encoding UTF-8 string: could not encode Unicode Surrogate codepoint 55296 (0xD800)
+# matches "\xd800\xdd51", '64f0908591';
+
+
+# ARRAYS
+
+matches [], '80';
+matches [1, 2, 3], '83010203';
+matches [1, [2, 3], [4, 5]], '8301820203820405';
+matches (my @ = 1..25), '98190102030405060708090a0b0c0d0e0f101112131415161718181819';
+
+
+# MAPS
+
+matches {}, 'a0';
+my %intkey{Mu} = 1, 2, 3, 4;
+matches %intkey, 'a201020304';
+matches {a => 1, b => [2, 3]}, 'a26161016162820203';
+matches ["a", {b => "c"}], '826161a161626163';
+matches {a => "A", b => "B", c => "C", d => "D", e => "E"}, 'a56161614161626142616361436164614461656145';
+
+
+# XXXX: Indefinite Length encodings
+
+
+done-testing;
