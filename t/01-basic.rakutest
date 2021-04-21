@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 51;
+plan 52;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -145,8 +145,9 @@ matches "\"\\", '62225c';
 matches "\x00fc", '62c3bc';
 matches "\x6c34", '63e6b0b4';
 
-# XXXX: Error encoding UTF-8 string: could not encode Unicode Surrogate codepoint 55296 (0xD800)
-# matches "\xd800\xdd51", '64f0908591';
+my $utf16 = blob16.new(0xd800, 0xdd51);
+my $str   = $utf16.decode('utf-16');
+matches $str, '64f0908591';
 
 
 # ARRAYS
