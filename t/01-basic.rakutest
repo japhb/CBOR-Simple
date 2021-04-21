@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 43;
+plan 45;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -72,9 +72,11 @@ matches 1000000000000, '1b000000e8d4a51000';
 matches 18446744073709551615, '1bffffffffffffffff';
 matches -18446744073709551616, '3bffffffffffffffff';
 
-# XXXX: Requires fixes to CBOR_Tag
-# matches 18446744073709551616, 'c249010000000000000000';
+# XXXX: Requires fixes to decoding CBOR_Tag
+# matches  18446744073709551616, 'c249010000000000000000';
 # matches -18446744073709551617, 'c349010000000000000000';
+encodes-to  18446744073709551616, 'c249010000000000000000';
+encodes-to -18446744073709551617, 'c349010000000000000000';
 
 matches -1, '20';
 matches -10, '29';
