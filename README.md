@@ -1,7 +1,7 @@
 NAME
 ====
 
-CBOR::Simple - blah blah blah
+CBOR::Simple - Simple codec for the CBOR serialization format
 
 SYNOPSIS
 ========
@@ -13,7 +13,7 @@ use CBOR::Simple;
 DESCRIPTION
 ===========
 
-CBOR::Simple is ...
+CBOR::Simple is a trivial implementation of the core functionality of the [CBOR serialization format](https://cbor.io/), implementing the standard as of [RFC 8949](https://tools.ietf.org/html/rfc8949).
 
 AUTHOR
 ======
