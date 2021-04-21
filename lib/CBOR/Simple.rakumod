@@ -111,20 +111,35 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             # if $num16 == $num64 {
             #     # XXXX: write-num16 is UNAVAILABLE!
             #     die "Cannot write a 16-bit num";
-
+            #
             #     $buf.write-uint8($pos++, CBOR_Num16);
             #     $buf.write-num16($pos, $num16, BigEndian);
+            #
+            #     # Canonify NaN sign bit to 0, even on platforms with -NaN
+            #     $buf.write-uint8($pos, $buf.read-uint8($pos +& 0x7F))
+            #         if $num16.isNaN;
+            #
             #     $pos += 2;
             # }
             # elsif $num32 == $num64 {
             if $num32 == $num64 {
                 $buf.write-uint8($pos++, CBOR_Num32);
                 $buf.write-num32($pos, $num32, BigEndian);
+
+                # Canonify NaN sign bit to 0, even on platforms with -NaN
+                $buf.write-uint8($pos, $buf.read-uint8($pos +& 0x7F))
+                    if $num32.isNaN;
+
                 $pos += 4;
             }
             else {
                 $buf.write-uint8($pos++, CBOR_Num64);
                 $buf.write-num64($pos, $num64, BigEndian);
+
+                # Canonify NaN sign bit to 0, even on platforms with -NaN
+                $buf.write-uint8($pos, $buf.read-uint8($pos +& 0x7F))
+                    if $num64.isNaN;
+
                 $pos += 8;
             }
         }
