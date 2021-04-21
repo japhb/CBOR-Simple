@@ -116,7 +116,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             #     $buf.write-num16($pos, $num16, BigEndian);
             #
             #     # Canonify NaN sign bit to 0, even on platforms with -NaN
-            #     $buf.write-uint8($pos, $buf.read-uint8($pos +& 0x7F))
+            #     $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
             #         if $num16.isNaN;
             #
             #     $pos += 2;
@@ -127,7 +127,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 $buf.write-num32($pos, $num32, BigEndian);
 
                 # Canonify NaN sign bit to 0, even on platforms with -NaN
-                $buf.write-uint8($pos, $buf.read-uint8($pos +& 0x7F))
+                $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
                     if $num32.isNaN;
 
                 $pos += 4;
@@ -137,7 +137,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 $buf.write-num64($pos, $num64, BigEndian);
 
                 # Canonify NaN sign bit to 0, even on platforms with -NaN
-                $buf.write-uint8($pos, $buf.read-uint8($pos +& 0x7F))
+                $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
                     if $num64.isNaN;
 
                 $pos += 8;
