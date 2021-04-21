@@ -96,9 +96,23 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 $_ >= 0 ?? write-uint(CBOR_UInt,   $_)
                         !! write-uint(CBOR_NInt, +^$_);
             }
+            # Unsigned BigInt
+            elsif $_ >= 0 {
+                $buf.write-uint8($pos++, CBOR_Tag + 2);
+                my @bytes = .polymod(256 xx *).reverse;
+                my $bytes = @bytes.elems;
+                write-uint(CBOR_BStr, $bytes);
+                $buf.splice($pos, $bytes, @bytes);
+                $pos += $bytes;
+            }
+            # Negative BigInt
             else {
-                # XXXX: BigInt
-                ...
+                $buf.write-uint8($pos++, CBOR_Tag + 3);
+                my @bytes = (+^$_).polymod(256 xx *).reverse;
+                my $bytes = @bytes.elems;
+                write-uint(CBOR_BStr, $bytes);
+                $buf.splice($pos, $bytes, @bytes);
+                $pos += $bytes;
             }
         }
         when Num {
