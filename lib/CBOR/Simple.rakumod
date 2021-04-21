@@ -44,9 +44,10 @@ enum CBORSizedType is export (
 
 
 # Introspection of tagged values
-role Tagged[$number, $desc = ''] {
-    method tag-number() { $number }
-    method tag-desc()   { $desc   }
+class Tagged {
+    has UInt:D $.tag-number is required;
+    has Mu     $.value      is required;
+    has Str:D  $.desc       =  '';
 }
 
 
@@ -291,9 +292,43 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
             }
         }
         when CBOR_Tag {
-            # XXXX: Not handling special tags
             my $tag-number = read-uint;
-            cbor-decode($cbor, $pos) but Tagged[$tag-number]
+            given $tag-number {
+                when 0 {
+                    my $dt = cbor-decode($cbor, $pos);
+                    fail "DateTime tag (0) does not contain a string"
+                        unless $dt ~~ Str:D;
+                    DateTime.new($dt) // fail "DateTime string could not be parsed"
+                }
+                when 1 {
+                    my $seconds = cbor-decode($cbor, $pos);
+                    fail "Epoch DateTime tag(1) does not contain a real number"
+                        unless $seconds ~~ Real:D;
+                    DateTime.new($seconds) // fail "Epoch DateTime could not be decoded"
+                }
+                when 2 {
+                    my $bytes = cbor-decode($cbor, $pos);
+                    fail "Unsigned BigInt does not contain a byte string"
+                        unless $bytes ~~ Buf:D;
+                    my $value = 0;
+                    $value = $value * 256 + $_ for @$bytes;
+                    $value
+                }
+                when 3 {
+                    my $bytes = cbor-decode($cbor, $pos);
+                    fail "Negative BigInt does not contain a byte string"
+                        unless $bytes ~~ Buf:D;
+                    my $value = 0;
+                    $value = $value * 256 + $_ for @$bytes;
+                    +^$value
+                }
+
+                # XXXX: Handle more special tags
+
+                default {
+                    Tagged.new(:$tag-number, :value(cbor-decode($cbor, $pos)))
+                }
+            }
         }
         when CBOR_SVal {
             my constant %svals = 20 => False, 21 => True, 22 => Any, 23 => Mu;
