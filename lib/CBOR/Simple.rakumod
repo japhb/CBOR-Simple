@@ -58,26 +58,26 @@ multi cbor-encode(Mu $value) is export {
 # Encode an arbitrary value to CBOR, specifying a buffer position to begin writing
 multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export {
     my sub write-uint($major-type, $value) {
-        if $_ <= 23 {
-            $buf.write-uint8($pos++, $major-type + $_);
+        if $value <= 23 {
+            $buf.write-uint8($pos++, $major-type + $value);
         }
-        elsif $_ <= 255 {
+        elsif $value <= 255 {
             $buf.write-uint8($pos++, $major-type + 24);
-            $buf.write-uint8($pos++, $_);
+            $buf.write-uint8($pos++, $value);
         }
-        elsif $_ <= 65535 {
+        elsif $value <= 65535 {
             $buf.write-uint8($pos++, $major-type + 25);
-            $buf.write-uint16($pos, $_, BigEndian);
+            $buf.write-uint16($pos, $value, BigEndian);
             $pos += 2;
         }
-        elsif $_ <= 4294967295 {
+        elsif $value <= 4294967295 {
             $buf.write-uint8($pos++, $major-type + 26);
-            $buf.write-uint32($pos, $_, BigEndian);
+            $buf.write-uint32($pos, $value, BigEndian);
             $pos += 4;
         }
-        elsif $_ <= 18446744073709551615 {
+        elsif $value <= 18446744073709551615 {
             $buf.write-uint8($pos++, $major-type + 27);
-            $buf.write-uint64($pos, $_, BigEndian);
+            $buf.write-uint64($pos, $value, BigEndian);
             $pos += 8;
         }
     }
@@ -85,20 +85,16 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
     given $value {
         # Any:U is CBOR null, other Mu:U is CBOR undefined
         when Mu:U {
-            $buf.write-uint8($pos++, CBOR_SVal + $_ ~~ Any ?? 22 !! 23);
+            $buf.write-uint8($pos++, CBOR_SVal + ($_ ~~ Any ?? 22 !! 23));
         }
         # All other values are defined
         when Bool {
-            $buf.write-uint8($pos++, CBOR_SVal + $_ ?? 21 !! 20);
+            $buf.write-uint8($pos++, CBOR_SVal + ($_ ?? 21 !! 20));
         }
         when Int {
-            my $major-type = CBOR_UInt;
-            if $_ < 0 {
-                $major-type = CBOR_NInt;
-                $_ = +^$_;
-            }
-            if $_ <= 18446744073709551615 {
-                write-uint($major-type, $_);
+            if -18446744073709551616 <= $_ <= 18446744073709551615 {
+                $_ >= 0 ?? write-uint(CBOR_UInt,   $_)
+                        !! write-uint(CBOR_NInt, +^$_);
             }
             else {
                 # XXXX: BigInt
@@ -128,7 +124,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             }
             else {
                 $buf.write-uint8($pos++, CBOR_Num64);
-                $buf.write-num32($pos, $num64, BigEndian);
+                $buf.write-num64($pos, $num64, BigEndian);
                 $pos += 8;
             }
         }
@@ -166,16 +162,23 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
         }
         when Associative {
             write-uint(CBOR_Map, .elems);
-            # XXXX: Doesn't sort keys
-            for .kv -> $k, $v {
-                cbor-encode($k, $pos, $buf);
-                cbor-encode($v, $pos, $buf);
+            my @pairs = .kv.map: -> $k, $v {
+                my $kbuf = cbor-encode($k);
+                $kbuf => $v
+            };
+            @pairs.sort(*.key).map: -> (:$key, :$value) {
+                my $bytes = $key.bytes;
+                $buf.splice($pos, $bytes, $key);
+                $pos += $bytes;
+                cbor-encode($value, $pos, $buf);
             }
         }
         default {
             fail "Don't know how to encode a {$value.^name}";
         }
     }
+
+    $buf
 }
 
 
@@ -227,23 +230,35 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
         }
         when CBOR_BStr {
             my $bytes = read-uint;
-            $cbor.subbuf($pos, $bytes)
+            my $buf = $cbor.subbuf($pos, $bytes);
+            $pos += $bytes;
+            $buf
         }
         when CBOR_TStr {
             my $bytes = read-uint;
             my $utf8  = $cbor.subbuf($pos, $bytes);
+            $pos += $bytes;
             $utf8.decode
         }
         when CBOR_Array {
             my $elems = read-uint;
-            (^$elems).map: { cbor-decode($cbor, $pos) }
+            my @ = (^$elems).map: { cbor-decode($cbor, $pos) }
         }
         when CBOR_Map {
             my $elems = read-uint;
-            my % = (^$elems).map: {
+            my @pairs = (^$elems).map: {
                 my $k = cbor-decode($cbor, $pos);
                 my $v = cbor-decode($cbor, $pos);
                 $k => $v
+            };
+
+            # Contains non-string keys?
+            if @pairs.first({.key !~~ Str}) {
+                # XXXX: Check for all keys being same type?
+                my %{Mu} = @pairs
+            }
+            else {
+                my % = @pairs
             }
         }
         when CBOR_Tag {
