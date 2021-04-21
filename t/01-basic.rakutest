@@ -1,0 +1,6 @@
+use Test;
+use CBOR::Simple;
+
+pass "replace me";
+
+done-testing;

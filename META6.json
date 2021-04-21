@@ -1,0 +1,24 @@
+{
+  "authors": [
+    "Geoffrey Broadwell"
+  ],
+  "build-depends": [
+  ],
+  "depends": [
+  ],
+  "description": "blah blah blah",
+  "license": "Artistic-2.0",
+  "name": "CBOR::Simple",
+  "perl": "6.d",
+  "provides": {
+    "CBOR::Simple": "lib/CBOR/Simple.rakumod"
+  },
+  "resources": [
+  ],
+  "source-url": "",
+  "tags": [
+  ],
+  "test-depends": [
+  ],
+  "version": "0.0.1"
+}
