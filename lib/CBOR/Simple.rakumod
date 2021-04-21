@@ -361,6 +361,8 @@ CBOR::Simple - Simple codec for the CBOR serialization format
 =begin code :lang<raku>
 
 use CBOR::Simple;
+my $cbor = cbor-encode($value);
+my $val  = cbor-decode($cbor);
 
 =end code
 

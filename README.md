@@ -8,6 +8,8 @@ SYNOPSIS
 
 ```raku
 use CBOR::Simple;
+my $cbor = cbor-encode($value);
+my $val  = cbor-decode($cbor);
 ```
 
 DESCRIPTION
