@@ -12,36 +12,6 @@ enum CBORMajorType is export (
     CBOR_SVal  => 7 +< 5,
 );
 
-enum CBORSizedType is export (
-    CBOR_UInt8  => CBOR_UInt + 24,
-    CBOR_UInt16 => CBOR_UInt + 25,
-    CBOR_UInt32 => CBOR_UInt + 26,
-    CBOR_UInt64 => CBOR_UInt + 27,
-
-    CBOR_NInt8  => CBOR_NInt + 24,
-    CBOR_NInt16 => CBOR_NInt + 25,
-    CBOR_NInt32 => CBOR_NInt + 26,
-    CBOR_NInt64 => CBOR_NInt + 27,
-
-    CBOR_Num16  => CBOR_SVal + 25,
-    CBOR_Num32  => CBOR_SVal + 26,
-    CBOR_Num64  => CBOR_SVal + 27,
-
-    CBOR_BStrXS => CBOR_BStr + 0,
-    CBOR_BStrS  => CBOR_BStr + 24,
-    CBOR_BStrM  => CBOR_BStr + 25,
-    CBOR_BStrL  => CBOR_BStr + 26,
-    CBOR_BStrXL => CBOR_BStr + 27,
-    CBOR_BStrIL => CBOR_BStr + 31,
-
-    CBOR_TStrXS => CBOR_TStr + 0,
-    CBOR_TStrS  => CBOR_TStr + 24,
-    CBOR_TStrM  => CBOR_TStr + 25,
-    CBOR_TStrL  => CBOR_TStr + 26,
-    CBOR_TStrXL => CBOR_TStr + 27,
-    CBOR_TStrIL => CBOR_TStr + 31,
-);
-
 
 # Introspection of tagged values
 class Tagged {
@@ -132,7 +102,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             #     # XXXX: write-num16 is UNAVAILABLE!
             #     die "Cannot write a 16-bit num";
             #
-            #     $buf.write-uint8($pos++, CBOR_Num16);
+            #     $buf.write-uint8($pos++, CBOR_SVal + 25);
             #     $buf.write-num16($pos, $num16, BigEndian);
             #
             #     # Canonify NaN sign bit to 0, even on platforms with -NaN
@@ -143,7 +113,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             # }
             # elsif $num32 == $num64 {
             if $num32 == $num64 {
-                $buf.write-uint8($pos++, CBOR_Num32);
+                $buf.write-uint8($pos++, CBOR_SVal + 26);
                 $buf.write-num32($pos, $num32, BigEndian);
 
                 # Canonify NaN sign bit to 0, even on platforms with -NaN
@@ -153,7 +123,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 $pos += 4;
             }
             else {
-                $buf.write-uint8($pos++, CBOR_Num64);
+                $buf.write-uint8($pos++, CBOR_SVal + 27);
                 $buf.write-num64($pos, $num64, BigEndian);
 
                 # Canonify NaN sign bit to 0, even on platforms with -NaN
