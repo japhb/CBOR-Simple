@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 75;
+plan 76;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -139,6 +139,9 @@ matches DateTime.new(1363896240),   'c11a514b67b0';
 matches DateTime.new(1363896240.5), 'c1fb41d452d9ec200000';
 
 # Extension tag 30: Rational number
+# First test from http://peteroupc.github.io/CBOR/rational.html, the rest by me
+matches 1/3,   'd81e820103';
+
 matches 3/7,   'd81e820307';
 matches -4/11, 'd81e82230b';
 matches Rat.new(    18446744073709551614, 18446744073709551615),
