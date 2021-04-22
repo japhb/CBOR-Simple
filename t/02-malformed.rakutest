@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 63;
+plan 71;
 
 
 # Failure can get "hidden" deep inside decoded structures, so fatalize instead
@@ -64,9 +64,8 @@ malformed($_, "Reserved two-byte encodings of simple values") for
 malformed($_, "Break occurring on its own outside of an indefinite-length item") for
     < ff >;
 
-# XXXX: Some detected, some not
-# malformed($_, "Break occurring in a definite-length array or map or a tag") for
-#     < 81ff 8200ff a1ff a1ff00 a100ff a20000ff 9f81ff 9f829f819f9fffffffff >;
+malformed($_, "Break occurring in a definite-length array or map or a tag") for
+    < 81ff 8200ff a1ff a1ff00 a100ff a20000ff 9f81ff 9f829f819f9fffffffff >;
 
 # XXXX: Requires handling of indefinite-length items
 # malformed($_, "Break in an indefinite-length map that would lead to an odd number of items (break in a value position)") for
