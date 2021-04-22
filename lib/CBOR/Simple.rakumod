@@ -50,6 +50,14 @@ class Tagged {
     has Str:D  $.desc       =  '';
 }
 
+# Parsing exceptions
+class X::Malformed is X::AdHoc {}
+
+my &fail-malformed = -> Str:D $reason {
+    my $ex = X::Malformed.new(:payload($reason));
+    fail $ex;
+}
+
 
 # Encode an arbitrary value to CBOR
 multi cbor-encode(Mu $value) is export {
@@ -257,7 +265,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
         }
         else {
             # XXXX: Not handling indefinite length yet
-            fail "Invalid argument $argument";
+            fail-malformed "Invalid argument $argument";
         }
     }
 
@@ -271,14 +279,14 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
         when CBOR_BStr {
             my $bytes = read-uint;
             my $buf = $cbor.subbuf($pos, $bytes);
-            fail "Byte string too short" unless $buf.bytes == $bytes;
+            fail-malformed "Byte string too short" unless $buf.bytes == $bytes;
             $pos += $bytes;
             $buf
         }
         when CBOR_TStr {
             my $bytes = read-uint;
             my $utf8  = $cbor.subbuf($pos, $bytes);
-            fail "Text string too short" unless $utf8.bytes == $bytes;
+            fail-malformed "Text string too short" unless $utf8.bytes == $bytes;
             $pos += $bytes;
             $utf8.decode
         }
@@ -308,19 +316,19 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
             given $tag-number {
                 when 0 {
                     my $dt = cbor-decode($cbor, $pos);
-                    fail "DateTime tag (0) does not contain a string"
+                    fail-malformed "DateTime tag (0) does not contain a string"
                         unless $dt ~~ Str:D;
-                    DateTime.new($dt) // fail "DateTime string could not be parsed"
+                    DateTime.new($dt) // fail-malformed "DateTime string could not be parsed"
                 }
                 when 1 {
                     my $seconds = cbor-decode($cbor, $pos);
-                    fail "Epoch DateTime tag(1) does not contain a real number"
+                    fail-malformed "Epoch DateTime tag(1) does not contain a real number"
                         unless $seconds ~~ Real:D;
-                    DateTime.new($seconds) // fail "Epoch DateTime could not be decoded"
+                    DateTime.new($seconds) // fail-malformed "Epoch DateTime could not be decoded"
                 }
                 when 2 {
                     my $bytes = cbor-decode($cbor, $pos);
-                    fail "Unsigned BigInt does not contain a byte string"
+                    fail-malformed "Unsigned BigInt does not contain a byte string"
                         unless $bytes ~~ Buf:D;
                     my $value = 0;
                     $value = $value * 256 + $_ for @$bytes;
@@ -328,7 +336,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
                 }
                 when 3 {
                     my $bytes = cbor-decode($cbor, $pos);
-                    fail "Negative BigInt does not contain a byte string"
+                    fail-malformed "Negative BigInt does not contain a byte string"
                         unless $bytes ~~ Buf:D;
                     my $value = 0;
                     $value = $value * 256 + $_ for @$bytes;
@@ -346,7 +354,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
             my constant %svals = 20 => False, 21 => True, 22 => Any, 23 => Mu;
 
             if $argument < 20 {
-                fail "Unassigned simple value $argument";
+                fail-malformed "Unassigned simple value $argument";
             }
             elsif $argument <= 23 {
                 %svals{$argument}
@@ -356,7 +364,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
                 my $fail = $val < 24 ?? "Badly formed" !!
                            $val < 32 ?? "Reserved"     !!
                                         "Unassigned"   ;
-                fail "$fail simple value $val";
+                fail-malformed "$fail simple value $val";
             }
             elsif $argument == 25 {
                 # XXXX: read-num16 is UNAVAILABLE!
@@ -378,7 +386,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
             }
             else {
                 # XXXX: Not handling indefinite length stop code yet
-                fail "Badly formed simple value $argument";
+                fail-malformed "Badly formed simple value $argument";
             }
         }
     }
