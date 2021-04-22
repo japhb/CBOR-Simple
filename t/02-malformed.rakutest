@@ -3,8 +3,11 @@ use Test;
 
 use CBOR::Simple;
 
-plan 56;
+plan 63;
 
+
+# Failure can get "hidden" deep inside decoded structures, so fatalize instead
+my $*CBOR_SIMPLE_FATAL_ERRORS = True;
 
 sub malformed(Str:D $cbor, Str:D $reason) {
     my $buf = buf8.new($cbor.comb(2).map(*.parse-base(16)));
@@ -28,9 +31,8 @@ malformed($_, "Definite-length strings with short data") for
     < 41 61 5affffffff00 5bffffffffffffffff010203
       7affffffff00 7b7fffffffffffffff010203 >;
 
-# XXXX: Failure gets "hidden" deep inside returned structure
-# malformed($_, "Definite-length maps and arrays not closed with enough items") for
-#     < 81 818181818181818181 8200 a1 a20102 a100 a2000000 >;
+malformed($_, "Definite-length maps and arrays not closed with enough items") for
+    < 81 818181818181818181 8200 a1 a20102 a100 a2000000 >;
 
 malformed($_, "Tag number not followed by tag content") for < c0 >;
 
