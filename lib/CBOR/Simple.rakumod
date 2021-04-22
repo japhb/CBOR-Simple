@@ -232,7 +232,9 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
 
 # Decode the first value from CBOR-encoded data
 multi cbor-decode(Blob:D $cbor) is export {
-    cbor-decode($cbor, my $pos = 0)
+    my $value = cbor-decode($cbor, my $pos = 0);
+    fail-malformed "Extra data after decoded value" if $pos < $cbor.bytes;
+    $value
 }
 
 # Decode the next value from CBOR-encoded data, starting at $pos
@@ -459,7 +461,8 @@ CBOR::Simple - Simple codec for the CBOR serialization format
 
 use CBOR::Simple;
 my $cbor = cbor-encode($value);
-my $val  = cbor-decode($cbor);
+my $val1 = cbor-decode($cbor);               # Fails if more data past first decoded value
+my $val2 = cbor-decode($cbor, my $pos = 0);  # Updates $pos after decoding first value
 
 =end code
 

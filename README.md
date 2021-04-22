@@ -11,7 +11,8 @@ SYNOPSIS
 ```raku
 use CBOR::Simple;
 my $cbor = cbor-encode($value);
-my $val  = cbor-decode($cbor);
+my $val1 = cbor-decode($cbor);               # Fails if more data past first decoded value
+my $val2 = cbor-decode($cbor, my $pos = 0);  # Updates $pos after decoding first value
 ```
 
 DESCRIPTION
