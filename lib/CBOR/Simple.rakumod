@@ -337,12 +337,26 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             }
         }
         when CBOR_Map {
-            my $elems = read-uint;
-            my @pairs = (^$elems).map: {
-                my $k = cbor-decode($cbor, $pos);
-                my $v = cbor-decode($cbor, $pos);
-                $k => $v
-            };
+            my $elems = read-uint(True);
+            my @pairs;
+
+            # Indefinite length
+            if $elems === Whatever {
+                loop {
+                    my $k = cbor-decode($cbor, $pos, :breakable);
+                    last if $k === Break;
+                    my $v = cbor-decode($cbor, $pos);
+                    @pairs.push: $k => $v;
+                }
+            }
+            # Definite length
+            else {
+                @pairs = (^$elems).map: {
+                    my $k = cbor-decode($cbor, $pos);
+                    my $v = cbor-decode($cbor, $pos);
+                    $k => $v
+                };
+            }
 
             # Contains non-string keys?
             if @pairs.first({.key !~~ Str}) {
@@ -515,8 +529,6 @@ L<RFC 8949|https://tools.ietf.org/html/rfc8949>.
 Currently known NOT to work:
 
 =item 16-bit floats (num16)
-
-=item Indefinite length maps
 
 =item Pass-through of unrecognized simple values
 
