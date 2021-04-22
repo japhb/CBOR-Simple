@@ -34,7 +34,7 @@ Currently known NOT to work:
 
   * Pass-through of unrecognized simple values
 
-  * Special decoding for registered tags other than numbers 0..3
+  * Special decoding for registered tags other than numbers 0..3 and 30
 
 SPECIAL CASES
 -------------

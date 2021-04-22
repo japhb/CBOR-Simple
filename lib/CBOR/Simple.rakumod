@@ -159,8 +159,13 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             $buf.write-uint8($pos++, CBOR_Tag);  # + 0
             cbor-encode(.yyyy-mm-dd, $pos, $buf);
         }
+        when Rational {
+            my @nude = .nude;
+            write-uint(CBOR_Tag, 30);
+            cbor-encode(@nude, $pos, $buf);
+        }
         when Real {
-            # XXXX: Pretend it's a Num
+            # XXXX: Pretend any other Real is a Num
             cbor-encode(.Num, $pos, $buf);
         }
         when Str {
@@ -399,6 +404,22 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                     +^$value
                 }
 
+                # XXXX: skipped tags 4, 5, 16..18, 21..29
+
+                when 30 {
+                    my $nude = cbor-decode($cbor, $pos);
+                    fail-malformed "Rational tag (30) does not contain an array"
+                        unless $nude ~~ Positional:D;
+                    fail-malformed "Rational tag (30) array does not have exactly 2 elements"
+                        unless $nude.elems == 2;
+                    fail-malformed "Rational tag (30) numerator is not an integer"
+                        unless $nude[0] ~~ Int:D;
+                    fail-malformed "Rational tag (30) numerator is not an unsigned integer"
+                        unless $nude[1] ~~ UInt:D;
+                    $nude[1] < 18446744073709551616 ?? Rat.new(   $nude[0], $nude[1])
+                                                    !! FatRat.new($nude[0], $nude[1]);
+                }
+
                 # XXXX: Handle more special tags
 
                 default {
@@ -532,7 +553,7 @@ Currently known NOT to work:
 
 =item Pass-through of unrecognized simple values
 
-=item Special decoding for registered tags other than numbers 0..3
+=item Special decoding for registered tags other than numbers 0..3 and 30
 
 
 =head2 SPECIAL CASES
