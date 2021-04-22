@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 57;
+plan 60;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -180,7 +180,17 @@ matches {a => "A", b => "B", c => "C", d => "D", e => "E"},
         'a56161614161626142616361436164614461656145';
 
 
-# XXXX: Indefinite Length encodings
+# INDEFINITE LENGTH VALUES
+
+decodes-to buf8.new(1,2,3,4,5), '5f42010243030405ff';
+decodes-to "streaming",         '7f657374726561646d696e67ff';
+
+# This test from section 3.2.3 of https://tools.ietf.org/html/rfc8949
+decodes-to buf8.new(0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x99),
+           '5f44aabbccdd43eeff99ff';
+
+# XXXX: Indefinite length arrays and maps
+
 
 
 done-testing;

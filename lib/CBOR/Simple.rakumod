@@ -13,6 +13,9 @@ enum CBORMajorType is export (
 );
 
 
+# Break sentinel
+my class Break { }
+
 # Introspection of tagged values
 class Tagged {
     has UInt:D $.tag-number is required;
@@ -214,7 +217,7 @@ multi cbor-decode(Blob:D $cbor) is export {
 }
 
 # Decode the next value from CBOR-encoded data, starting at $pos
-multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
+multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is export {
     my &fail-malformed = -> Str:D $reason {
         my $ex = X::Malformed.new(:payload($reason));
         $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
@@ -231,7 +234,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
     my $major-type   = $initial-byte +& 0xE0;
     my $argument     = $initial-byte +& 0x1F;
 
-    my &read-uint = {
+    my &read-uint = -> $allow-indefinite = False {
         if $argument <= 23 {
             $argument
         }
@@ -253,8 +256,11 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
             $pos += 8;
             $v
         }
+        elsif $argument == 31 {
+            $allow-indefinite ?? Whatever
+                              !! fail-malformed "Unexpected indefinite argument";
+        }
         else {
-            # XXXX: Not handling indefinite length yet
             fail-malformed "Invalid argument $argument";
         }
     }
@@ -267,24 +273,52 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
             +^read-uint
         }
         when CBOR_BStr {
-            my $bytes = read-uint;
-            fail-malformed "Unreasonably long byte string"
-                if $bytes > 9223372036854775807;
+            my $bytes = read-uint(!$breakable);
 
-            my $buf = $cbor.subbuf($pos, $bytes);
-            fail-malformed "Byte string too short" unless $buf.bytes == $bytes;
-            $pos += $bytes;
-            $buf
+            # Indefinite length
+            if $bytes === Whatever {
+                my buf8 $joined .= new;
+                while (my $chunk = cbor-decode($cbor, $pos, :breakable)) !=== Break {
+                    fail-malformed "Byte string chunk has wrong type"
+                        unless $chunk ~~ Buf:D;
+                    $joined.append($chunk);
+                }
+                $joined
+            }
+            # Definite length
+            else {
+                fail-malformed "Unreasonably long byte string"
+                    if $bytes > 9223372036854775807;
+
+                my $buf = $cbor.subbuf($pos, $bytes);
+                fail-malformed "Byte string too short" unless $buf.bytes == $bytes;
+                $pos += $bytes;
+                $buf
+            }
         }
         when CBOR_TStr {
-            my $bytes = read-uint;
-            fail-malformed "Unreasonably long text string"
-                if $bytes > 9223372036854775807;
+            my $bytes = read-uint(!$breakable);
 
-            my $utf8  = $cbor.subbuf($pos, $bytes);
-            fail-malformed "Text string too short" unless $utf8.bytes == $bytes;
-            $pos += $bytes;
-            $utf8.decode
+            # Indefinite length
+            if $bytes === Whatever {
+                my @chunks;
+                while (my $chunk = cbor-decode($cbor, $pos, :breakable)) !=== Break {
+                    fail-malformed "Text string chunk has wrong type"
+                        unless $chunk ~~ Str:D;
+                    @chunks.push($chunk);
+                }
+                @chunks.join
+            }
+            # Definite length
+            else {
+                fail-malformed "Unreasonably long text string"
+                    if $bytes > 9223372036854775807;
+
+                my $utf8  = $cbor.subbuf($pos, $bytes);
+                fail-malformed "Text string too short" unless $utf8.bytes == $bytes;
+                $pos += $bytes;
+                $utf8.decode
+            }
         }
         when CBOR_Array {
             my $elems = read-uint;
@@ -380,6 +414,10 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
                 $pos += 8;
                 $v
             }
+            elsif $argument == 31 {
+                $breakable ?? Break
+                           !! fail-malformed "Unexpected break signal";
+            }
             else {
                 # XXXX: Not handling indefinite length stop code yet
                 fail-malformed "Badly formed simple value $argument";
@@ -466,7 +504,7 @@ Currently known NOT to work:
 
 =item 16-bit floats (num16)
 
-=item Indefinite length encodings
+=item Indefinite length maps and arrays
 
 =item Pass-through of unrecognized simple values
 

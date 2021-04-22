@@ -32,7 +32,7 @@ Currently known NOT to work:
 
   * 16-bit floats (num16)
 
-  * Indefinite length encodings
+  * Indefinite length maps and arrays
 
   * Pass-through of unrecognized simple values
 
