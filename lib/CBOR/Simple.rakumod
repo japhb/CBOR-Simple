@@ -470,6 +470,31 @@ CBOR::Simple is a trivial implementation of the core functionality of the
 L<CBOR serialization format|https://cbor.io/>, implementing the standard as of
 L<RFC 8949|https://tools.ietf.org/html/rfc8949>.
 
+Currently known NOT to work:
+
+=item 16-bit floats (num16)
+
+=item Minimal-length NaN coding
+
+=item Indefinite length encodings
+
+=item Pass-through of unrecognized simple values
+
+=item Special decoding for registered tags other than numbers 0..3
+
+
+=head2 SPECIAL CASES
+
+=item CBOR's C<null> is translated as C<Any> in Raku
+
+=item CBOR's C<undefined> is translated as C<Mu> in Raku
+
+=item C<Instant> and C<DateTime> are both written as tag 1 (epoch-based date/time)
+
+=item Both tag 0 (date/time string) and tag 1 (epoch-based date/time) are read as C<DateTime>
+
+=item CBOR strings claiming to be longer than C<2⁶‭³‭-1> are treated as malformed
+
 
 =head1 AUTHOR
 
