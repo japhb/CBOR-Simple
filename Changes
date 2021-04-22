@@ -1,4 +1,8 @@
 Revision history for CBOR-Simple
 
-{{$NEXT}}
-    - Initial version
+0.0.2  2021-04-21
+  - Massive improvement; aside from num16, handles most core functionality
+
+
+0.0.1  2021-04-20
+  - Initial version, very incomplete
