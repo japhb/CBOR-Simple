@@ -98,6 +98,12 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             my num32 $num32 = $num64;
             # my num16 $num16 = $num64;
 
+            my $use32 = $num32 == $num64 || $num64.isNaN && do {
+                my buf8 $nan .= new;
+                $nan.write-num64(0, $num64, BigEndian);
+                $nan[4] == $nan[5] == $nan[6] == $nan[7] == 0
+            };
+
             # if $num16 == $num64 {
             #     # XXXX: write-num16 is UNAVAILABLE!
             #     die "Cannot write a 16-bit num";
@@ -111,8 +117,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             #
             #     $pos += 2;
             # }
-            # elsif $num32 == $num64 {
-            if $num32 == $num64 {
+            if $use32 {
                 $buf.write-uint8($pos++, CBOR_SVal + 26);
                 $buf.write-num32($pos, $num32, BigEndian);
 
@@ -460,8 +465,6 @@ L<RFC 8949|https://tools.ietf.org/html/rfc8949>.
 Currently known NOT to work:
 
 =item 16-bit floats (num16)
-
-=item Minimal-length NaN coding
 
 =item Indefinite length encodings
 

@@ -32,8 +32,6 @@ Currently known NOT to work:
 
   * 16-bit floats (num16)
 
-  * Minimal-length NaN coding
-
   * Indefinite length encodings
 
   * Pass-through of unrecognized simple values

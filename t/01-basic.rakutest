@@ -105,11 +105,11 @@ matches   -4.1e0, 'fbc010666666666666';
 # matches    NaN, 'f97e00';
 # matches   -Inf, 'f9fc00';
 
-# Current state: NaN produces 64-bit output, ±‭Inf produces 32-bit output
-# XXXX: This isn't ideal (both should produce 16-bit output), but it's not
+# Current state: No 16-bit num support, so these all produce 32-bit output.
+# XXXX: This isn't ideal (all should produce 16-bit output), but it's not
 #       *wrong*, so for now just prevent regression.
 encodes-to  Inf, 'fa7f800000';
-encodes-to  NaN, 'fb7ff8000000000000';
+encodes-to  NaN, 'fa7fc00000';
 encodes-to -Inf, 'faff800000';
 
 decodes-to  Inf, 'fa7f800000';
