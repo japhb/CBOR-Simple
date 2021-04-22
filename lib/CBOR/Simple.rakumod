@@ -237,6 +237,13 @@ multi cbor-decode(Blob:D $cbor) is export {
 
 # Decode the next value from CBOR-encoded data, starting at $pos
 multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
+    CATCH {
+        when /^ 'MVMArray: read_buf out of bounds' / {
+            fail-malformed "Early end of input";
+        }
+        default { .rethrow }
+    }
+
     my $initial-byte = $cbor.read-uint8($pos++);
     my $major-type   = $initial-byte +& 0xE0;
     my $argument     = $initial-byte +& 0x1F;
