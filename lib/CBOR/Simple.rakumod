@@ -321,8 +321,20 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             }
         }
         when CBOR_Array {
-            my $elems = read-uint;
-            my @ = (^$elems).map: { cbor-decode($cbor, $pos) }
+            my $elems = read-uint(True);
+
+            # Indefinite length
+            if $elems === Whatever {
+                my @array;
+                while (my $item = cbor-decode($cbor, $pos, :breakable)) !=== Break {
+                    @array.push($item);
+                }
+                @array
+            }
+            # Definite length
+            else {
+                my @ = (^$elems).map: { cbor-decode($cbor, $pos) }
+            }
         }
         when CBOR_Map {
             my $elems = read-uint;
@@ -504,7 +516,7 @@ Currently known NOT to work:
 
 =item 16-bit floats (num16)
 
-=item Indefinite length maps and arrays
+=item Indefinite length maps
 
 =item Pass-through of unrecognized simple values
 

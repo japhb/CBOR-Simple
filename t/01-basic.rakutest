@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 60;
+plan 66;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -189,8 +189,15 @@ decodes-to "streaming",         '7f657374726561646d696e67ff';
 decodes-to buf8.new(0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x99),
            '5f44aabbccdd43eeff99ff';
 
-# XXXX: Indefinite length arrays and maps
+decodes-to [],                  '9fff';
+decodes-to [1, [2, 3], [4, 5]], '9f018202039f0405ffff';
+decodes-to [1, [2, 3], [4, 5]], '9f01820203820405ff';
+decodes-to [1, [2, 3], [4, 5]], '83018202039f0405ff';
+decodes-to [1, [2, 3], [4, 5]], '83019f0203ff820405';
+decodes-to (my @ = 1..25),
+           '9f0102030405060708090a0b0c0d0e0f101112131415161718181819ff';
 
+# XXXX: Indefinite length maps
 
 
 done-testing;
