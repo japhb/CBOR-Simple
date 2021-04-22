@@ -1,7 +1,7 @@
 unit module CBOR::Simple:auth<zef:japhb>:api<0>:ver<0.0.2>;
 
 
-enum CBORMajorType is export (
+enum CBORMajorType (
     CBOR_UInt  => 0,
     CBOR_NInt  => 1 +< 5,
     CBOR_BStr  => 2 +< 5,
@@ -13,8 +13,47 @@ enum CBORMajorType is export (
 );
 
 
+enum CBORMagicNumber (
+    CBOR_MajorType_Mask => 0xE0,
+    CBOR_Argument_Mask  => 0x1F,
+
+    CBOR_False => 20,
+    CBOR_True  => 21,
+    CBOR_Null  => 22,
+    CBOR_Undef => 23,
+
+    CBOR_1Byte => 24,
+    CBOR_2Byte => 25,
+    CBOR_4Byte => 26,
+    CBOR_8Byte => 27,
+
+    CBOR_Indefinite_Break => 31,
+
+    CBOR_Max_UInt_1Byte => 255,
+    CBOR_Max_UInt_2Byte => 65535,
+    CBOR_Max_UInt_4Byte => 4294967295,
+    CBOR_Max_UInt_8Byte => 18446744073709551615,
+    CBOR_Max_UInt_63Bit => 9223372036854775807,
+
+    CBOR_Min_NInt_1Byte => -256,
+    CBOR_Min_NInt_2Byte => -65536,
+    CBOR_Min_NInt_4Byte => -4294967296,
+    CBOR_Min_NInt_8Byte => -18446744073709551616,
+);
+
+
+enum CBORTagNumber (
+    CBOR_Tag_DateTime_String => 0,
+    CBOR_Tag_DateTime_Number => 1,
+    CBOR_Tag_Unsigned_BigInt => 2,
+    CBOR_Tag_Negative_BigInt => 3,
+    CBOR_Tag_Rational        => 30,
+);
+
+
 # Break sentinel
 my class Break { }
+
 
 # Introspection of tagged values
 class Tagged {
@@ -22,6 +61,7 @@ class Tagged {
     has Mu     $.value      is required;
     has Str:D  $.desc       =  '';
 }
+
 
 # Parsing exceptions
 class X::Malformed is X::AdHoc {}
@@ -37,25 +77,25 @@ multi cbor-encode(Mu $value) is export {
 # Encode an arbitrary value to CBOR, specifying a buffer position to begin writing
 multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export {
     my sub write-uint($major-type, $value) {
-        if $value <= 23 {
+        if $value < CBOR_1Byte {
             $buf.write-uint8($pos++, $major-type + $value);
         }
-        elsif $value <= 255 {
-            $buf.write-uint8($pos++, $major-type + 24);
+        elsif $value <= CBOR_Max_UInt_1Byte {
+            $buf.write-uint8($pos++, $major-type + CBOR_1Byte);
             $buf.write-uint8($pos++, $value);
         }
-        elsif $value <= 65535 {
-            $buf.write-uint8($pos++, $major-type + 25);
+        elsif $value <= CBOR_Max_UInt_2Byte {
+            $buf.write-uint8($pos++, $major-type + CBOR_2Byte);
             $buf.write-uint16($pos, $value, BigEndian);
             $pos += 2;
         }
-        elsif $value <= 4294967295 {
-            $buf.write-uint8($pos++, $major-type + 26);
+        elsif $value <= CBOR_Max_UInt_4Byte {
+            $buf.write-uint8($pos++, $major-type + CBOR_4Byte);
             $buf.write-uint32($pos, $value, BigEndian);
             $pos += 4;
         }
-        elsif $value <= 18446744073709551615 {
-            $buf.write-uint8($pos++, $major-type + 27);
+        elsif $value <= CBOR_Max_UInt_8Byte {
+            $buf.write-uint8($pos++, $major-type + CBOR_8Byte);
             $buf.write-uint64($pos, $value, BigEndian);
             $pos += 8;
         }
@@ -64,20 +104,20 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
     given $value {
         # Any:U is CBOR null, other Mu:U is CBOR undefined
         when Mu:U {
-            $buf.write-uint8($pos++, CBOR_SVal + ($_ ~~ Any ?? 22 !! 23));
+            $buf.write-uint8($pos++, CBOR_SVal + ($_ ~~ Any ?? CBOR_Null !! CBOR_Undef));
         }
         # All other values are defined
         when Bool {
-            $buf.write-uint8($pos++, CBOR_SVal + ($_ ?? 21 !! 20));
+            $buf.write-uint8($pos++, CBOR_SVal + ($_ ?? CBOR_True !! CBOR_False));
         }
         when Int {
-            if -18446744073709551616 <= $_ <= 18446744073709551615 {
+            if CBOR_Min_NInt_8Byte <= $_ <= CBOR_Max_UInt_8Byte {
                 $_ >= 0 ?? write-uint(CBOR_UInt,   $_)
                         !! write-uint(CBOR_NInt, +^$_);
             }
             # Unsigned BigInt
             elsif $_ >= 0 {
-                $buf.write-uint8($pos++, CBOR_Tag + 2);
+                $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_Unsigned_BigInt);
                 my @bytes = .polymod(256 xx *).reverse;
                 my $bytes = @bytes.elems;
                 write-uint(CBOR_BStr, $bytes);
@@ -86,7 +126,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             }
             # Negative BigInt
             else {
-                $buf.write-uint8($pos++, CBOR_Tag + 3);
+                $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_Negative_BigInt);
                 my @bytes = (+^$_).polymod(256 xx *).reverse;
                 my $bytes = @bytes.elems;
                 write-uint(CBOR_BStr, $bytes);
@@ -111,7 +151,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             #     # XXXX: write-num16 is UNAVAILABLE!
             #     die "Cannot write a 16-bit num";
             #
-            #     $buf.write-uint8($pos++, CBOR_SVal + 25);
+            #     $buf.write-uint8($pos++, CBOR_SVal + CBOR_2Byte);
             #     $buf.write-num16($pos, $num16, BigEndian);
             #
             #     # Canonify NaN sign bit to 0, even on platforms with -NaN
@@ -121,7 +161,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             #     $pos += 2;
             # }
             if $use32 {
-                $buf.write-uint8($pos++, CBOR_SVal + 26);
+                $buf.write-uint8($pos++, CBOR_SVal + CBOR_4Byte);
                 $buf.write-num32($pos, $num32, BigEndian);
 
                 # Canonify NaN sign bit to 0, even on platforms with -NaN
@@ -131,7 +171,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 $pos += 4;
             }
             else {
-                $buf.write-uint8($pos++, CBOR_SVal + 27);
+                $buf.write-uint8($pos++, CBOR_SVal + CBOR_8Byte);
                 $buf.write-num64($pos, $num64, BigEndian);
 
                 # Canonify NaN sign bit to 0, even on platforms with -NaN
@@ -145,23 +185,23 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             my $num = .to-posix[0].Num;
             my $val = $num.Int == $num ?? $num.Int !! $num;
 
-            $buf.write-uint8($pos++, CBOR_Tag + 1);
+            $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
             cbor-encode($val, $pos, $buf);
         }
         when DateTime {
             my $num = .Instant.to-posix[0].Num;
             my $val = $num.Int == $num ?? $num.Int !! $num;
 
-            $buf.write-uint8($pos++, CBOR_Tag + 1);
+            $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
             cbor-encode($val, $pos, $buf);
         }
         when Dateish {
-            $buf.write-uint8($pos++, CBOR_Tag);  # + 0
+            $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_String);
             cbor-encode(.yyyy-mm-dd, $pos, $buf);
         }
         when Rational {
             my @nude = .nude;
-            write-uint(CBOR_Tag, 30);
+            write-uint(CBOR_Tag, CBOR_Tag_Rational);
             cbor-encode(@nude, $pos, $buf);
         }
         when Real {
@@ -236,32 +276,32 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
     }
 
     my $initial-byte = $cbor.read-uint8($pos++);
-    my $major-type   = $initial-byte +& 0xE0;
-    my $argument     = $initial-byte +& 0x1F;
+    my $major-type   = $initial-byte +& CBOR_MajorType_Mask;
+    my $argument     = $initial-byte +& CBOR_Argument_Mask;
 
     my &read-uint = -> $allow-indefinite = False {
-        if $argument <= 23 {
+        if $argument < CBOR_1Byte {
             $argument
         }
-        elsif $argument == 24 {
+        elsif $argument == CBOR_1Byte {
             $cbor.read-uint8($pos++)
         }
-        elsif $argument == 25 {
+        elsif $argument == CBOR_2Byte {
             my $v = $cbor.read-uint16($pos, BigEndian);
             $pos += 2;
             $v
         }
-        elsif $argument == 26 {
+        elsif $argument == CBOR_4Byte {
             my $v = $cbor.read-uint32($pos, BigEndian);
             $pos += 4;
             $v
         }
-        elsif $argument == 27 {
+        elsif $argument == CBOR_8Byte {
             my $v = $cbor.read-uint64($pos, BigEndian);
             $pos += 8;
             $v
         }
-        elsif $argument == 31 {
+        elsif $argument == CBOR_Indefinite_Break {
             $allow-indefinite ?? Whatever
                               !! fail-malformed "Unexpected indefinite argument";
         }
@@ -293,7 +333,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             # Definite length
             else {
                 fail-malformed "Unreasonably long byte string"
-                    if $bytes > 9223372036854775807;
+                    if $bytes > CBOR_Max_UInt_63Bit;
 
                 my $buf = $cbor.subbuf($pos, $bytes);
                 fail-malformed "Byte string too short" unless $buf.bytes == $bytes;
@@ -317,7 +357,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             # Definite length
             else {
                 fail-malformed "Unreasonably long text string"
-                    if $bytes > 9223372036854775807;
+                    if $bytes > CBOR_Max_UInt_63Bit;
 
                 my $utf8  = $cbor.subbuf($pos, $bytes);
                 fail-malformed "Text string too short" unless $utf8.bytes == $bytes;
@@ -375,19 +415,19 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         when CBOR_Tag {
             my $tag-number = read-uint;
             given $tag-number {
-                when 0 {
+                when CBOR_Tag_DateTime_String {
                     my $dt = cbor-decode($cbor, $pos);
                     fail-malformed "DateTime tag (0) does not contain a string"
                         unless $dt ~~ Str:D;
                     DateTime.new($dt) // fail-malformed "DateTime string could not be parsed"
                 }
-                when 1 {
+                when CBOR_Tag_DateTime_Number {
                     my $seconds = cbor-decode($cbor, $pos);
                     fail-malformed "Epoch DateTime tag(1) does not contain a real number"
                         unless $seconds ~~ Real:D;
                     DateTime.new($seconds) // fail-malformed "Epoch DateTime could not be decoded"
                 }
-                when 2 {
+                when CBOR_Tag_Unsigned_BigInt {
                     my $bytes = cbor-decode($cbor, $pos);
                     fail-malformed "Unsigned BigInt does not contain a byte string"
                         unless $bytes ~~ Buf:D;
@@ -395,7 +435,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                     $value = $value * 256 + $_ for @$bytes;
                     $value
                 }
-                when 3 {
+                when CBOR_Tag_Negative_BigInt {
                     my $bytes = cbor-decode($cbor, $pos);
                     fail-malformed "Negative BigInt does not contain a byte string"
                         unless $bytes ~~ Buf:D;
@@ -406,7 +446,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
 
                 # XXXX: skipped tags 4, 5, 16..18, 21..29
 
-                when 30 {
+                when CBOR_Tag_Rational {
                     my $nude = cbor-decode($cbor, $pos);
                     fail-malformed "Rational tag (30) does not contain an array"
                         unless $nude ~~ Positional:D;
@@ -430,20 +470,20 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         when CBOR_SVal {
             my constant %svals = 20 => False, 21 => True, 22 => Any, 23 => Mu;
 
-            if $argument < 20 {
+            if $argument < CBOR_False {
                 fail-malformed "Unassigned simple value $argument";
             }
-            elsif $argument <= 23 {
+            elsif $argument <= CBOR_Undef {
                 %svals{$argument}
             }
-            elsif $argument == 24 {
+            elsif $argument == CBOR_1Byte {
                 my $val  = $cbor.read-uint8($pos++);
                 my $fail = $val < 24 ?? "Badly formed" !!
                            $val < 32 ?? "Reserved"     !!
                                         "Unassigned"   ;
                 fail-malformed "$fail simple value $val";
             }
-            elsif $argument == 25 {
+            elsif $argument == CBOR_2Byte {
                 # XXXX: read-num16 is UNAVAILABLE!
                 die "Cannot read a 16-bit num";
 
@@ -451,17 +491,17 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 $pos += 2;
                 $v
             }
-            elsif $argument == 26 {
+            elsif $argument == CBOR_4Byte {
                 my $v = $cbor.read-num32($pos, BigEndian);
                 $pos += 4;
                 $v
             }
-            elsif $argument == 27 {
+            elsif $argument == CBOR_8Byte {
                 my $v = $cbor.read-num64($pos, BigEndian);
                 $pos += 8;
                 $v
             }
-            elsif $argument == 31 {
+            elsif $argument == CBOR_Indefinite_Break {
                 $breakable ?? Break
                            !! fail-malformed "Unexpected break signal";
             }
@@ -482,8 +522,8 @@ multi cbor-diagnostic(Blob:D $cbor) is export {
 # Convert a CBOR-encoded value to human diagnostic form, starting at $pos
 multi cbor-diagnostic(Blob:D $cbor, Int:D $pos is rw) is export {
     my $initial-byte = $cbor.read-uint8($pos++);
-    my $major-type   = $initial-byte +& 0xE0;
-    my $val          = $initial-byte +& 0x1F;
+    my $major-type   = $initial-byte +& CBOR_MajorType_Mask;
+    my $val          = $initial-byte +& CBOR_Argument_Mask;
 
     given $major-type {
         when CBOR_UInt {

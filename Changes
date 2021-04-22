@@ -1,7 +1,9 @@
 Revision history for CBOR-Simple
 
 0.0.3  *WIP*
+  - Enum and magic number reform
   - Minor tweaks
+
 
 0.0.2  2021-04-21
   - Massive improvement; aside from num16, handles most core functionality
