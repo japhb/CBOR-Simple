@@ -551,8 +551,6 @@ Currently known NOT to work:
 
 =item 16-bit floats (num16)
 
-=item Pass-through of unrecognized simple values
-
 =item Special decoding for registered tags other than numbers 0..3 and 30
 
 
