@@ -53,11 +53,6 @@ class Tagged {
 # Parsing exceptions
 class X::Malformed is X::AdHoc {}
 
-my &fail-malformed = -> Str:D $reason {
-    my $ex = X::Malformed.new(:payload($reason));
-    fail $ex;
-}
-
 
 # Encode an arbitrary value to CBOR
 multi cbor-encode(Mu $value) is export {
@@ -233,12 +228,17 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
 # Decode the first value from CBOR-encoded data
 multi cbor-decode(Blob:D $cbor) is export {
     my $value = cbor-decode($cbor, my $pos = 0);
-    fail-malformed "Extra data after decoded value" if $pos < $cbor.bytes;
+    fail(X::Malformed.new(:payload("Extra data after decoded value")))
+        if $pos < $cbor.bytes;
     $value
 }
 
 # Decode the next value from CBOR-encoded data, starting at $pos
 multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
+    my &fail-malformed = -> Str:D $reason {
+        fail X::Malformed.new(:payload($reason));
+    }
+
     CATCH {
         when /^ 'MVMArray: read_buf out of bounds' / {
             fail-malformed "Early end of input";
@@ -250,7 +250,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
     my $major-type   = $initial-byte +& 0xE0;
     my $argument     = $initial-byte +& 0x1F;
 
-    my sub read-uint() {
+    my &read-uint = {
         if $argument <= 23 {
             $argument
         }
