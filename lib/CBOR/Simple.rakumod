@@ -120,6 +120,31 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             $buf.splice($pos, $bytes, $utf8);
             $pos += $bytes;
         }
+        when Blob {
+            my $bytes = .bytes;
+
+            write-uint(CBOR_BStr, $bytes);
+            $buf.splice($pos, $bytes, $_);
+            $pos += $bytes;
+        }
+        # XXXX: Seq/Iterator?
+        when Positional {
+            write-uint(CBOR_Array, .elems);
+            cbor-encode($_, $pos, $buf) for @$_;
+        }
+        when Associative {
+            write-uint(CBOR_Map, .elems);
+            my @pairs = .kv.map: -> $k, $v {
+                my $kbuf = cbor-encode($k);
+                $kbuf => $v
+            };
+            @pairs.sort(*.key).map: -> (:$key, :$value) {
+                my $bytes = $key.bytes;
+                $buf.splice($pos, $bytes, $key);
+                $pos += $bytes;
+                cbor-encode($value, $pos, $buf);
+            }
+        }
         when Bool {
             $buf.write-uint8($pos++, CBOR_SVal + ($_ ?? CBOR_True !! CBOR_False));
         }
@@ -220,31 +245,6 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
         when Real {
             # XXXX: Pretend any other Real is a Num
             cbor-encode(.Num, $pos, $buf);
-        }
-        when Blob {
-            my $bytes = .bytes;
-
-            write-uint(CBOR_BStr, $bytes);
-            $buf.splice($pos, $bytes, $_);
-            $pos += $bytes;
-        }
-        # XXXX: Seq/Iterator?
-        when Positional {
-            write-uint(CBOR_Array, .elems);
-            cbor-encode($_, $pos, $buf) for @$_;
-        }
-        when Associative {
-            write-uint(CBOR_Map, .elems);
-            my @pairs = .kv.map: -> $k, $v {
-                my $kbuf = cbor-encode($k);
-                $kbuf => $v
-            };
-            @pairs.sort(*.key).map: -> (:$key, :$value) {
-                my $bytes = $key.bytes;
-                $buf.splice($pos, $bytes, $key);
-                $pos += $bytes;
-                cbor-encode($value, $pos, $buf);
-            }
         }
         default {
             my $ex = "Don't know how to encode a {$value.^name}";
