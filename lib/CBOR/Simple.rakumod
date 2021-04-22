@@ -278,6 +278,9 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
         }
         when CBOR_BStr {
             my $bytes = read-uint;
+            fail-malformed "Unreasonably long byte string"
+                if $bytes > 9223372036854775807;
+
             my $buf = $cbor.subbuf($pos, $bytes);
             fail-malformed "Byte string too short" unless $buf.bytes == $bytes;
             $pos += $bytes;
@@ -285,6 +288,9 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
         }
         when CBOR_TStr {
             my $bytes = read-uint;
+            fail-malformed "Unreasonably long text string"
+                if $bytes > 9223372036854775807;
+
             my $utf8  = $cbor.subbuf($pos, $bytes);
             fail-malformed "Text string too short" unless $utf8.bytes == $bytes;
             $pos += $bytes;
