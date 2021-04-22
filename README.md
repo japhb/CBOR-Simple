@@ -13,6 +13,14 @@ use CBOR::Simple;
 my $cbor = cbor-encode($value);
 my $val1 = cbor-decode($cbor);               # Fails if more data past first decoded value
 my $val2 = cbor-decode($cbor, my $pos = 0);  # Updates $pos after decoding first value
+
+# By default, cbor-decode() marks partially corrupt parsed structures with
+# Failure nodes at the point of corruption
+my $bad = cbor-decode(buf8.new(0x81 xx 3));  # [[[Failure]]]
+
+# Callers can instead force throwing exceptions on any error
+my $*CBOR_SIMPLE_FATAL_ERRORS = True;
+my $bad = cbor-decode(buf8.new(0x81 xx 3));  # BOOM!
 ```
 
 DESCRIPTION

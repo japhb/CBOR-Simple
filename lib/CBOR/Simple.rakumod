@@ -53,6 +53,8 @@ class Tagged {
 # Parsing exceptions
 class X::Malformed is X::AdHoc {}
 
+PROCESS::<$CBOR_SIMPLE_FATAL_ERRORS> = False;
+
 
 # Encode an arbitrary value to CBOR
 multi cbor-encode(Mu $value) is export {
@@ -217,7 +219,8 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             }
         }
         default {
-            fail "Don't know how to encode a {$value.^name}";
+            my $ex = "Don't know how to encode a {$value.^name}";
+            $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
         }
     }
 
@@ -228,15 +231,18 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
 # Decode the first value from CBOR-encoded data
 multi cbor-decode(Blob:D $cbor) is export {
     my $value = cbor-decode($cbor, my $pos = 0);
-    fail(X::Malformed.new(:payload("Extra data after decoded value")))
-        if $pos < $cbor.bytes;
+    if $pos < $cbor.bytes {
+        my $ex = X::Malformed.new(:payload("Extra data after decoded value"));
+        $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
+    }
     $value
 }
 
 # Decode the next value from CBOR-encoded data, starting at $pos
 multi cbor-decode(Blob:D $cbor, Int:D $pos is rw) is export {
     my &fail-malformed = -> Str:D $reason {
-        fail X::Malformed.new(:payload($reason));
+        my $ex = X::Malformed.new(:payload($reason));
+        $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
     }
 
     CATCH {
@@ -463,6 +469,14 @@ use CBOR::Simple;
 my $cbor = cbor-encode($value);
 my $val1 = cbor-decode($cbor);               # Fails if more data past first decoded value
 my $val2 = cbor-decode($cbor, my $pos = 0);  # Updates $pos after decoding first value
+
+# By default, cbor-decode() marks partially corrupt parsed structures with
+# Failure nodes at the point of corruption
+my $bad = cbor-decode(buf8.new(0x81 xx 3));  # [[[Failure]]]
+
+# Callers can instead force throwing exceptions on any error
+my $*CBOR_SIMPLE_FATAL_ERRORS = True;
+my $bad = cbor-decode(buf8.new(0x81 xx 3));  # BOOM!
 
 =end code
 
