@@ -68,6 +68,9 @@ class X::Malformed is X::AdHoc {}
 
 PROCESS::<$CBOR_SIMPLE_FATAL_ERRORS> = False;
 
+# Precache a utf8 encoder, since we'll be doing it a LOT
+my $utf8-encoder = Encoding::Registry.find("utf8").encoder;
+
 
 # Encode an arbitrary value to CBOR
 multi cbor-encode(Mu $value) is export {
@@ -107,6 +110,16 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             $buf.write-uint8($pos++, CBOR_SVal + ($_ ~~ Any ?? CBOR_Null !! CBOR_Undef));
         }
         # All other values are defined
+
+        # Strings are REALLY common; test for them early
+        when Str {
+            my $utf8  = $utf8-encoder.encode-chars($_);
+            my $bytes = $utf8.bytes;
+
+            write-uint(CBOR_TStr, $bytes);
+            $buf.splice($pos, $bytes, $utf8);
+            $pos += $bytes;
+        }
         when Bool {
             $buf.write-uint8($pos++, CBOR_SVal + ($_ ?? CBOR_True !! CBOR_False));
         }
@@ -207,14 +220,6 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
         when Real {
             # XXXX: Pretend any other Real is a Num
             cbor-encode(.Num, $pos, $buf);
-        }
-        when Str {
-            my $utf8  = .encode;
-            my $bytes = $utf8.bytes;
-
-            write-uint(CBOR_TStr, $bytes);
-            $buf.splice($pos, $bytes, $utf8);
-            $pos += $bytes;
         }
         when Blob {
             my $bytes = .bytes;
