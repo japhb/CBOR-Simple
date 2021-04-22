@@ -10,18 +10,20 @@ plan 24;
 
 sub malformed(Str:D $cbor, Str:D $reason) {
     my $buf = buf8.new($cbor.comb(2).map(*.parse-base(16)));
-    throws-like { cbor-decode($buf) }, X::AdHoc, $reason;
+    throws-like { cbor-decode($buf) }, X::AdHoc, "$reason ($cbor)";
 }
 
 
 ### Below adapted from https://tools.ietf.org/html/rfc8949#appendix-F
 
-malformed($_, "End of input in a head ($_)") for
+# WELL-FORMEDNESS ERROR KIND 2 (TOO LITTLE DATA)
+
+malformed($_, "End of input in a head") for
     < 18 19 1a 1b 1901 1a0102 1b01020304050607
       38 58 78 98             9a01ff00
       b8 d8 f8    f900 fa0000 fb000000 >;
 
-malformed($_, "Definite-length strings with short data ($_)") for
+malformed($_, "Definite-length strings with short data") for
     < 41 61 5affffffff00 5bffffffffffffffff010203
       7affffffff00 7b7fffffffffffffff010203 >;
 
