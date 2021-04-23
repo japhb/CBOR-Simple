@@ -1,4 +1,4 @@
-unit module CBOR::Simple:auth<zef:japhb>:api<0>:ver<0.0.2>;
+unit module CBOR::Simple:auth<zef:japhb>:api<0>:ver<0.0.3>;
 
 
 enum CBORMajorType (

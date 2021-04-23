@@ -1,6 +1,6 @@
 Revision history for CBOR-Simple
 
-0.0.3  *WIP*
+0.0.3  2022-04-22
   - Low-hanging fruit performance optimizations
   - Enum and magic number reform
   - Minor tweaks
