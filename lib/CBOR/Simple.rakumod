@@ -141,8 +141,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             write-uint(CBOR_Map, .elems);
             if RFC8949_Map_Key_Sort {
                 my @pairs = .kv.map: -> $k, $v {
-                    my $kbuf = cbor-encode($k);
-                    $kbuf => $v
+                    cbor-encode($k, my $ = 0) => $v
                 };
                 @pairs.sort(*.key).map: -> (:$key, :$value) {
                     my $bytes = $key.bytes;
