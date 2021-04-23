@@ -140,14 +140,14 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
         when Associative {
             write-uint(CBOR_Map, .elems);
             if RFC8949_Map_Key_Sort {
-                my @pairs = .kv.map: -> $k, $v {
-                    cbor-encode($k, my $ = 0) => $v
+                my @pairs = .map: {
+                    cbor-encode(.key, my $ = 0) => .value
                 };
-                @pairs.sort(*.key).map: -> (:$key, :$value) {
-                    my $bytes = $key.bytes;
-                    $buf.splice($pos, $bytes, $key);
+                @pairs.sort(*.key).map: {
+                    my $bytes = .key.bytes;
+                    $buf.splice($pos, $bytes, .key);
                     $pos += $bytes;
-                    cbor-encode($value, $pos, $buf);
+                    cbor-encode(.value, $pos, $buf);
                 }
             }
             else {
