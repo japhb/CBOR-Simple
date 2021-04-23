@@ -271,7 +271,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
 
 # Decode the first value from CBOR-encoded data
 multi cbor-decode(Blob:D $cbor) is export {
-    my $value = cbor-decode($cbor, my $pos = 0);
+    my $value := cbor-decode($cbor, my $pos = 0);
     if $pos < $cbor.bytes {
         my $ex = X::Malformed.new(:payload("Extra data after decoded value"));
         $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
@@ -341,7 +341,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             # Indefinite length
             if $bytes === Whatever {
                 my buf8 $joined .= new;
-                while (my $chunk = cbor-decode($cbor, $pos, :breakable)) !=== Break {
+                until (my $chunk := cbor-decode($cbor, $pos, :breakable)) =:= Break {
                     fail-malformed "Byte string chunk has wrong type"
                         unless $chunk ~~ Buf:D;
                     $joined.append($chunk);
@@ -365,7 +365,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             # Indefinite length
             if $bytes === Whatever {
                 my @chunks;
-                while (my $chunk = cbor-decode($cbor, $pos, :breakable)) !=== Break {
+                until (my $chunk := cbor-decode($cbor, $pos, :breakable)) =:= Break {
                     fail-malformed "Text string chunk has wrong type"
                         unless $chunk ~~ Str:D;
                     @chunks.push($chunk);
@@ -389,7 +389,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             # Indefinite length
             if $elems === Whatever {
                 my @array;
-                while (my $item = cbor-decode($cbor, $pos, :breakable)) !=== Break {
+                until (my $item := cbor-decode($cbor, $pos, :breakable)) =:= Break {
                     @array.push($item);
                 }
                 @array
@@ -407,16 +407,16 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             # Indefinite length
             if $elems === Whatever {
                 loop {
-                    my $k = cbor-decode($cbor, $pos, :breakable);
-                    last if $k === Break;
-                    ($k ~~ Str ?? %str-map !! %mu-map){$k} = cbor-decode($cbor, $pos);
+                    my $k := cbor-decode($cbor, $pos, :breakable);
+                    last if $k =:= Break;
+                    ($k ~~ Str ?? %str-map !! %mu-map){$k} := cbor-decode($cbor, $pos);
                 }
             }
             # Definite length
             else {
                 for ^$elems {
-                    my $k = cbor-decode($cbor, $pos);
-                    ($k ~~ Str ?? %str-map !! %mu-map){$k} = cbor-decode($cbor, $pos);
+                    my $k := cbor-decode($cbor, $pos);
+                    ($k ~~ Str ?? %str-map !! %mu-map){$k} := cbor-decode($cbor, $pos);
                 }
             }
 
@@ -432,19 +432,19 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             my $tag-number = read-uint;
             given $tag-number {
                 when CBOR_Tag_DateTime_String {
-                    my $dt = cbor-decode($cbor, $pos);
+                    my $dt := cbor-decode($cbor, $pos);
                     fail-malformed "DateTime tag (0) does not contain a string"
                         unless $dt ~~ Str:D;
                     DateTime.new($dt) // fail-malformed "DateTime string could not be parsed"
                 }
                 when CBOR_Tag_DateTime_Number {
-                    my $seconds = cbor-decode($cbor, $pos);
+                    my $seconds := cbor-decode($cbor, $pos);
                     fail-malformed "Epoch DateTime tag(1) does not contain a real number"
                         unless $seconds ~~ Real:D;
                     DateTime.new($seconds) // fail-malformed "Epoch DateTime could not be decoded"
                 }
                 when CBOR_Tag_Unsigned_BigInt {
-                    my $bytes = cbor-decode($cbor, $pos);
+                    my $bytes := cbor-decode($cbor, $pos);
                     fail-malformed "Unsigned BigInt does not contain a byte string"
                         unless $bytes ~~ Buf:D;
                     my $value = 0;
@@ -452,7 +452,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                     $value
                 }
                 when CBOR_Tag_Negative_BigInt {
-                    my $bytes = cbor-decode($cbor, $pos);
+                    my $bytes := cbor-decode($cbor, $pos);
                     fail-malformed "Negative BigInt does not contain a byte string"
                         unless $bytes ~~ Buf:D;
                     my $value = 0;
@@ -463,7 +463,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 # XXXX: skipped tags 4, 5, 16..18, 21..29
 
                 when CBOR_Tag_Rational {
-                    my $nude = cbor-decode($cbor, $pos);
+                    my $nude := cbor-decode($cbor, $pos);
                     fail-malformed "Rational tag (30) does not contain an array"
                         unless $nude ~~ Positional:D;
                     fail-malformed "Rational tag (30) array does not have exactly 2 elements"
