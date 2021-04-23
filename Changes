@@ -1,6 +1,7 @@
 Revision history for CBOR-Simple
 
 0.0.3  *WIP*
+  - Low-hanging fruit performance optimizations
   - Enum and magic number reform
   - Minor tweaks
 
