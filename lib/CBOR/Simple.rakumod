@@ -377,7 +377,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 fail-malformed "Unreasonably long text string"
                     if $bytes > CBOR_Max_UInt_63Bit;
 
-                my $utf8  = $cbor.subbuf($pos, $bytes);
+                my $utf8 = $cbor.subbuf($pos, $bytes);
                 fail-malformed "Text string too short" unless $utf8.bytes == $bytes;
                 $pos += $bytes;
                 $utf8.decode
