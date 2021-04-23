@@ -401,33 +401,31 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         }
         when CBOR_Map {
             my $elems = read-uint(True);
-            my @pairs;
+            my %str-map;
+            my %mu-map{Mu};
 
             # Indefinite length
             if $elems === Whatever {
                 loop {
                     my $k = cbor-decode($cbor, $pos, :breakable);
                     last if $k === Break;
-                    my $v = cbor-decode($cbor, $pos);
-                    @pairs.push: $k => $v;
+                    ($k ~~ Str ?? %str-map !! %mu-map){$k} = cbor-decode($cbor, $pos);
                 }
             }
             # Definite length
             else {
-                @pairs = (^$elems).map: {
+                for ^$elems {
                     my $k = cbor-decode($cbor, $pos);
-                    my $v = cbor-decode($cbor, $pos);
-                    $k => $v
-                };
+                    ($k ~~ Str ?? %str-map !! %mu-map){$k} = cbor-decode($cbor, $pos);
+                }
             }
 
-            # Contains non-string keys?
-            if @pairs.first({.key !~~ Str}) {
-                # XXXX: Check for all keys being same type?
-                my %{Mu} = @pairs
+            if %mu-map.elems {
+                %mu-map{$_} = %str-map{$_} for %str-map.keys;
+                %mu-map
             }
             else {
-                my % = @pairs
+                %str-map
             }
         }
         when CBOR_Tag {
