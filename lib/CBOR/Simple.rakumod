@@ -68,8 +68,13 @@ class X::Malformed is X::AdHoc {}
 
 PROCESS::<$CBOR_SIMPLE_FATAL_ERRORS> = False;
 
+
 # Precache a utf8 encoder, since we'll be doing it a LOT
 my $utf8-encoder = Encoding::Registry.find("utf8").encoder;
+
+
+# Don't use the RFC 8949 map key sorting, it's really slow
+constant RFC8949_Map_Key_Sort = False;
 
 
 # Encode an arbitrary value to CBOR
@@ -134,15 +139,23 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
         }
         when Associative {
             write-uint(CBOR_Map, .elems);
-            my @pairs = .kv.map: -> $k, $v {
-                my $kbuf = cbor-encode($k);
-                $kbuf => $v
-            };
-            @pairs.sort(*.key).map: -> (:$key, :$value) {
-                my $bytes = $key.bytes;
-                $buf.splice($pos, $bytes, $key);
-                $pos += $bytes;
-                cbor-encode($value, $pos, $buf);
+            if RFC8949_Map_Key_Sort {
+                my @pairs = .kv.map: -> $k, $v {
+                    my $kbuf = cbor-encode($k);
+                    $kbuf => $v
+                };
+                @pairs.sort(*.key).map: -> (:$key, :$value) {
+                    my $bytes = $key.bytes;
+                    $buf.splice($pos, $bytes, $key);
+                    $pos += $bytes;
+                    cbor-encode($value, $pos, $buf);
+                }
+            }
+            else {
+                for .sort {
+                    cbor-encode(.key,   $pos, $buf);
+                    cbor-encode(.value, $pos, $buf);
+                }
             }
         }
         when Bool {
