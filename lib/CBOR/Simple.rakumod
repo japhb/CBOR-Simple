@@ -111,21 +111,128 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
 
     # Defined values
     with $value {
-        # Strings are REALLY common; test for them early
-        when Str {
-            my $utf8  = $utf8-encoder.encode-chars($_);
-            my $bytes = $utf8.bytes;
+        # First classify by general role, then by actual type
 
-            write-uint(CBOR_TStr, $bytes);
-            $buf.splice($pos, $bytes, $utf8);
-            $pos += $bytes;
+        # Check for Numeric before Stringy so allomorphs prefer Numeric
+        when Numeric {
+            when Bool {
+                $buf.write-uint8($pos++, CBOR_SVal + ($_ ?? CBOR_True !! CBOR_False));
+            }
+            when Int {
+                if CBOR_Min_NInt_8Byte <= $_ <= CBOR_Max_UInt_8Byte {
+                    $_ >= 0 ?? write-uint(CBOR_UInt,   $_)
+                            !! write-uint(CBOR_NInt, +^$_);
+                }
+                # Unsigned BigInt
+                elsif $_ >= 0 {
+                    $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_Unsigned_BigInt);
+                    my @bytes = .polymod(256 xx *).reverse;
+                    my $bytes = @bytes.elems;
+                    write-uint(CBOR_BStr, $bytes);
+                    $buf.splice($pos, $bytes, @bytes);
+                    $pos += $bytes;
+                }
+                # Negative BigInt
+                else {
+                    $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_Negative_BigInt);
+                    my @bytes = (+^$_).polymod(256 xx *).reverse;
+                    my $bytes = @bytes.elems;
+                    write-uint(CBOR_BStr, $bytes);
+                    $buf.splice($pos, $bytes, @bytes);
+                    $pos += $bytes;
+                }
+            }
+            when Num {
+                # XXXX: Doesn't write short NaNs yet
+
+                my num64 $num64 = $_;
+                my num32 $num32 = $num64;
+                # my num16 $num16 = $num64;
+
+                my $use32 = $num32 == $num64 || $num64.isNaN && do {
+                    my buf8 $nan .= new;
+                    $nan.write-num64(0, $num64, BigEndian);
+                    $nan[4] == $nan[5] == $nan[6] == $nan[7] == 0
+                };
+
+                # if $num16 == $num64 {
+                #     # XXXX: write-num16 is UNAVAILABLE!
+                #     die "Cannot write a 16-bit num";
+                #
+                #     $buf.write-uint8($pos++, CBOR_SVal + CBOR_2Byte);
+                #     $buf.write-num16($pos, $num16, BigEndian);
+                #
+                #     # Canonify NaN sign bit to 0, even on platforms with -NaN
+                #     $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
+                #         if $num16.isNaN;
+                #
+                #     $pos += 2;
+                # }
+                if $use32 {
+                    $buf.write-uint8($pos++, CBOR_SVal + CBOR_4Byte);
+                    $buf.write-num32($pos, $num32, BigEndian);
+
+                    # Canonify NaN sign bit to 0, even on platforms with -NaN
+                    $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
+                        if $num32.isNaN;
+
+                    $pos += 4;
+                }
+                else {
+                    $buf.write-uint8($pos++, CBOR_SVal + CBOR_8Byte);
+                    $buf.write-num64($pos, $num64, BigEndian);
+
+                    # Canonify NaN sign bit to 0, even on platforms with -NaN
+                    $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
+                        if $num64.isNaN;
+
+                    $pos += 8;
+                }
+            }
+            when Rational {
+                # write-uint(CBOR_Tag, CBOR_Tag_Rational);
+                $buf.write-uint8($pos++, CBOR_Tag + CBOR_1Byte);
+                $buf.write-uint8($pos++, CBOR_Tag_Rational);
+                $buf.write-uint8($pos++, CBOR_Array + 2);
+                cbor-encode(.numerator,   $pos, $buf);
+                cbor-encode(.denominator, $pos, $buf);
+            }
+            when Instant {
+                my $num = .to-posix[0].Num;
+                my $val = $num.Int == $num ?? $num.Int !! $num;
+
+                $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
+                cbor-encode($val, $pos, $buf);
+            }
+            when Real {
+                # XXXX: Pretend any other Real is a Num
+                cbor-encode(.Num, $pos, $buf);
+            }
+            default {
+                my $ex = "Don't know how to encode a {$value.^name}";
+                $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
+            }
         }
-        when Blob {
-            my $bytes = .bytes;
+        when Stringy {
+            when Str {
+                my $utf8  = $utf8-encoder.encode-chars($_);
+                my $bytes = $utf8.bytes;
 
-            write-uint(CBOR_BStr, $bytes);
-            $buf.splice($pos, $bytes, $_);
-            $pos += $bytes;
+                write-uint(CBOR_TStr, $bytes);
+                $buf.splice($pos, $bytes, $utf8);
+                $pos += $bytes;
+            }
+            when Blob {
+                my $bytes = .bytes;
+
+                write-uint(CBOR_BStr, $bytes);
+                $buf.splice($pos, $bytes, $_);
+                $pos += $bytes;
+            }
+            default {
+                my $ex = "Don't know how to encode a {$value.^name}";
+                $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
+            }
         }
         # XXXX: Seq/Iterator?
         when Positional {
@@ -152,109 +259,18 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 }
             }
         }
-        when Bool {
-            $buf.write-uint8($pos++, CBOR_SVal + ($_ ?? CBOR_True !! CBOR_False));
-        }
-        when Int {
-            if CBOR_Min_NInt_8Byte <= $_ <= CBOR_Max_UInt_8Byte {
-                $_ >= 0 ?? write-uint(CBOR_UInt,   $_)
-                        !! write-uint(CBOR_NInt, +^$_);
-            }
-            # Unsigned BigInt
-            elsif $_ >= 0 {
-                $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_Unsigned_BigInt);
-                my @bytes = .polymod(256 xx *).reverse;
-                my $bytes = @bytes.elems;
-                write-uint(CBOR_BStr, $bytes);
-                $buf.splice($pos, $bytes, @bytes);
-                $pos += $bytes;
-            }
-            # Negative BigInt
-            else {
-                $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_Negative_BigInt);
-                my @bytes = (+^$_).polymod(256 xx *).reverse;
-                my $bytes = @bytes.elems;
-                write-uint(CBOR_BStr, $bytes);
-                $buf.splice($pos, $bytes, @bytes);
-                $pos += $bytes;
-            }
-        }
-        when Num {
-            # XXXX: Doesn't write short NaNs yet
-
-            my num64 $num64 = $_;
-            my num32 $num32 = $num64;
-            # my num16 $num16 = $num64;
-
-            my $use32 = $num32 == $num64 || $num64.isNaN && do {
-                my buf8 $nan .= new;
-                $nan.write-num64(0, $num64, BigEndian);
-                $nan[4] == $nan[5] == $nan[6] == $nan[7] == 0
-            };
-
-            # if $num16 == $num64 {
-            #     # XXXX: write-num16 is UNAVAILABLE!
-            #     die "Cannot write a 16-bit num";
-            #
-            #     $buf.write-uint8($pos++, CBOR_SVal + CBOR_2Byte);
-            #     $buf.write-num16($pos, $num16, BigEndian);
-            #
-            #     # Canonify NaN sign bit to 0, even on platforms with -NaN
-            #     $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
-            #         if $num16.isNaN;
-            #
-            #     $pos += 2;
-            # }
-            if $use32 {
-                $buf.write-uint8($pos++, CBOR_SVal + CBOR_4Byte);
-                $buf.write-num32($pos, $num32, BigEndian);
-
-                # Canonify NaN sign bit to 0, even on platforms with -NaN
-                $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
-                    if $num32.isNaN;
-
-                $pos += 4;
-            }
-            else {
-                $buf.write-uint8($pos++, CBOR_SVal + CBOR_8Byte);
-                $buf.write-num64($pos, $num64, BigEndian);
-
-                # Canonify NaN sign bit to 0, even on platforms with -NaN
-                $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
-                    if $num64.isNaN;
-
-                $pos += 8;
-            }
-        }
-        when Instant {
-            my $num = .to-posix[0].Num;
-            my $val = $num.Int == $num ?? $num.Int !! $num;
-
-            $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
-            cbor-encode($val, $pos, $buf);
-        }
-        when DateTime {
-            my $num = .Instant.to-posix[0].Num;
-            my $val = $num.Int == $num ?? $num.Int !! $num;
-
-            $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
-            cbor-encode($val, $pos, $buf);
-        }
         when Dateish {
-            $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_String);
-            cbor-encode(.yyyy-mm-dd, $pos, $buf);
-        }
-        when Rational {
-            # write-uint(CBOR_Tag, CBOR_Tag_Rational);
-            $buf.write-uint8($pos++, CBOR_Tag + CBOR_1Byte);
-            $buf.write-uint8($pos++, CBOR_Tag_Rational);
-            $buf.write-uint8($pos++, CBOR_Array + 2);
-            cbor-encode(.numerator,   $pos, $buf);
-            cbor-encode(.denominator, $pos, $buf);
-        }
-        when Real {
-            # XXXX: Pretend any other Real is a Num
-            cbor-encode(.Num, $pos, $buf);
+            when DateTime {
+                my $num = .Instant.to-posix[0].Num;
+                my $val = $num.Int == $num ?? $num.Int !! $num;
+
+                $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
+                cbor-encode($val, $pos, $buf);
+            }
+            default {
+                $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_String);
+                cbor-encode(.yyyy-mm-dd, $pos, $buf);
+            }
         }
         default {
             my $ex = "Don't know how to encode a {$value.^name}";
