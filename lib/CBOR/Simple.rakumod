@@ -525,7 +525,6 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                            !! fail-malformed "Unexpected break signal";
             }
             else {
-                # XXXX: Not handling indefinite length stop code yet
                 fail-malformed "Badly formed simple value $argument";
             }
         }
