@@ -109,13 +109,8 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
         }
     }
 
-    given $value {
-        # Any:U is CBOR null, other Mu:U is CBOR undefined
-        when Mu:U {
-            $buf.write-uint8($pos++, CBOR_SVal + ($_ ~~ Any ?? CBOR_Null !! CBOR_Undef));
-        }
-        # All other values are defined
-
+    # Defined values
+    with $value {
         # Strings are REALLY common; test for them early
         when Str {
             my $utf8  = $utf8-encoder.encode-chars($_);
@@ -265,6 +260,11 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             my $ex = "Don't know how to encode a {$value.^name}";
             $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
         }
+    }
+    # Undefined values
+    else {
+        # Any:U is CBOR null, other Mu:U is CBOR undefined
+        $buf.write-uint8($pos++, CBOR_SVal + ($value ~~ Any ?? CBOR_Null !! CBOR_Undef));
     }
 
     $buf
