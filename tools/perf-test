@@ -1,0 +1,69 @@
+#!/usr/bin/env raku
+
+# NOTE: To test a structure pulled from a JSON file, you'll need a JSON test
+#       file to work with.  I snapshotted mine from ~/.zef/store/360.zef.pm .
+
+
+use JSON::Fast;
+use CBOR::Simple;
+
+
+sub time-them(Str:D $test, UInt:D $count, &for-json, &for-cbor) {
+    my $t0 = now;
+    for-json() for ^$count;
+    my $t1 = now;
+    for-cbor() for ^$count;
+    my $t2 = now;
+
+    say "\n$test:";
+    printf "JSON: %8.3fs\n", $t1-$t0;
+    printf "CBOR: %8.3fs (%.3fx)\n", $t2-$t1, ($t2-$t1)/($t1-$t0);
+}
+
+sub time-codecs(Str:D $variant, UInt:D $count, $struct) {
+    say "\n====> $variant <====";
+
+    my $cbor = cbor-encode $struct;
+    my $json = to-json     $struct, :!pretty;
+
+    say "\nSizes:";
+    my $json-bytes = $json.encode.bytes;
+    my $cbor-bytes = $cbor.bytes;
+    printf "JSON: %8d\n", $json-bytes;
+    printf "CBOR: %8d (%.3fx)\n", $cbor-bytes, $cbor-bytes / $json-bytes;
+
+    say "\nFidelity:";
+    my $from-cbor = cbor-decode $cbor;
+    my $from-json = from-json   $json;
+    say "JSON:    ", $from-json eqv $struct ?? 'pass' !! 'FAIL';
+    say "CBOR:    ", $from-cbor eqv $struct ?? 'pass' !! 'FAIL';
+
+    time-them('Decode', $count,
+              { my $s = from-json $json },
+              { my $d = cbor-decode $cbor });
+
+    time-them('Encode', $count,
+              { my $j = to-json $struct, :!pretty },
+              { my $e = cbor-encode $struct });
+}
+
+
+multi MAIN(UInt:D $count = 100, IO() $source = 'fez-test.json') {
+    say "Testing $count iteration{$count == 1 ?? '' !! 's'}";
+
+    my $json      = $source.slurp;
+    my $from-json = from-json $json;
+    time-codecs('JSON source', $count, $from-json);
+
+    my $AoA-Int = [ [$++ xx 100] xx 100 ];
+    time-codecs('100 x 100 Int array', $count, $AoA-Int);
+
+    my $AoA-Num = [ [rand xx 100] xx 100 ];
+    time-codecs('100 x 100 Num array', $count, $AoA-Num);
+
+    my $AoA-Rat = [ [((^256).pick / (1..255).pick) xx 100] xx 100 ];
+    time-codecs('100 x 100 small Rat array', $count, $AoA-Rat);
+
+    my $buf8 = buf8.new((^256).roll(100_000));
+    time-codecs('100_000 byte buf8', $count, $buf8);
+}
