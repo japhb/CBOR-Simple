@@ -250,9 +250,12 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             cbor-encode(.yyyy-mm-dd, $pos, $buf);
         }
         when Rational {
-            my @nude = .nude;
-            write-uint(CBOR_Tag, CBOR_Tag_Rational);
-            cbor-encode(@nude, $pos, $buf);
+            # write-uint(CBOR_Tag, CBOR_Tag_Rational);
+            $buf.write-uint8($pos++, CBOR_Tag + CBOR_1Byte);
+            $buf.write-uint8($pos++, CBOR_Tag_Rational);
+            $buf.write-uint8($pos++, CBOR_Array + 2);
+            cbor-encode(.numerator,   $pos, $buf);
+            cbor-encode(.denominator, $pos, $buf);
         }
         when Real {
             # XXXX: Pretend any other Real is a Num
@@ -462,17 +465,18 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 # XXXX: skipped tags 4, 5, 16..18, 21..29
 
                 when CBOR_Tag_Rational {
-                    my $nude := cbor-decode($cbor, $pos);
-                    fail-malformed "Rational tag (30) does not contain an array"
-                        unless $nude ~~ Positional:D;
-                    fail-malformed "Rational tag (30) array does not have exactly 2 elements"
-                        unless $nude.elems == 2;
+                    fail-malformed "Rational tag (30) does not contain an array with exactly two elements"
+                        unless $cbor.read-uint8($pos++) == CBOR_Array + 2;
+
+                    my $nu := cbor-decode($cbor, $pos);
+                    my $de := cbor-decode($cbor, $pos);
                     fail-malformed "Rational tag (30) numerator is not an integer"
-                        unless $nude[0] ~~ Int:D;
-                    fail-malformed "Rational tag (30) numerator is not an unsigned integer"
-                        unless $nude[1] ~~ UInt:D;
-                    $nude[1] < 18446744073709551616 ?? Rat.new(   $nude[0], $nude[1])
-                                                    !! FatRat.new($nude[0], $nude[1]);
+                        unless $nu ~~ Int:D;
+                    fail-malformed "Rational tag (30) denominator is not an unsigned integer"
+                        unless $de ~~ UInt:D;
+
+                    $de < 18446744073709551616 ?? Rat.new(   $nu, $de)
+                                               !! FatRat.new($nu, $de)
                 }
 
                 # XXXX: Handle more special tags
