@@ -116,10 +116,10 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
 
         # Check for Numeric before Stringy so allomorphs prefer Numeric
         if nqp::istype($_, Numeric) {
-            when Bool {
+            if nqp::istype($_, Bool) {
                 $buf.write-uint8($pos++, CBOR_SVal + ($_ ?? CBOR_True !! CBOR_False));
             }
-            when Int {
+            elsif nqp::istype($_, Int) {
                 if CBOR_Min_NInt_8Byte <= $_ <= CBOR_Max_UInt_8Byte {
                     $_ >= 0 ?? write-uint(CBOR_UInt,   $_)
                             !! write-uint(CBOR_NInt, +^$_);
@@ -143,7 +143,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     $pos += $bytes;
                 }
             }
-            when Num {
+            elsif nqp::istype($_, Num) {
                 # XXXX: Doesn't write short NaNs yet
 
                 my num64 $num64 = $_;
@@ -190,7 +190,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     $pos += 8;
                 }
             }
-            when Rational {
+            elsif nqp::istype($_, Rational) {
                 # write-uint(CBOR_Tag, CBOR_Tag_Rational);
                 $buf.write-uint8($pos++, CBOR_Tag + CBOR_1Byte);
                 $buf.write-uint8($pos++, CBOR_Tag_Rational);
@@ -198,24 +198,24 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 cbor-encode(.numerator,   $pos, $buf);
                 cbor-encode(.denominator, $pos, $buf);
             }
-            when Instant {
+            elsif nqp::istype($_, Instant) {
                 my $num = .to-posix[0].Num;
                 my $val = $num.Int == $num ?? $num.Int !! $num;
 
                 $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
                 cbor-encode($val, $pos, $buf);
             }
-            when Real {
+            elsif nqp::istype($_, Real) {
                 # XXXX: Pretend any other Real is a Num
                 cbor-encode(.Num, $pos, $buf);
             }
-            default {
+            else {
                 my $ex = "Don't know how to encode a {$value.^name}";
                 $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
             }
         }
         elsif nqp::istype($_, Stringy) {
-            when Str {
+            if nqp::istype($_, Str) {
                 my $utf8  = $utf8-encoder.encode-chars($_);
                 my $bytes = $utf8.bytes;
 
@@ -223,14 +223,14 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 $buf.splice($pos, $bytes, $utf8);
                 $pos += $bytes;
             }
-            when Blob {
+            elsif nqp::istype($_, Blob) {
                 my $bytes = .bytes;
 
                 write-uint(CBOR_BStr, $bytes);
                 $buf.splice($pos, $bytes, $_);
                 $pos += $bytes;
             }
-            default {
+            else {
                 my $ex = "Don't know how to encode a {$value.^name}";
                 $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
             }
@@ -261,14 +261,14 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             }
         }
         elsif nqp::istype($_, Dateish) {
-            when DateTime {
+            if nqp::istype($_, DateTime) {
                 my $num = .Instant.to-posix[0].Num;
                 my $val = $num.Int == $num ?? $num.Int !! $num;
 
                 $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
                 cbor-encode($val, $pos, $buf);
             }
-            default {
+            else {
                 $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_String);
                 cbor-encode(.yyyy-mm-dd, $pos, $buf);
             }
