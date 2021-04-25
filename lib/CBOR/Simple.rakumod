@@ -145,19 +145,17 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 }
             }
             elsif nqp::istype($_, Num) {
-                # XXXX: Doesn't write short NaNs yet
+                my $isnan = .isNaN;
+                my num32 $num32 = $_;
 
-                my num64 $num64 = $_;
-                my num32 $num32 = $num64;
-                # my num16 $num16 = $num64;
-
-                my $use32 = $num32 == $num64 || $num64.isNaN && do {
+                my $use32 = $num32 == $_ || $isnan && do {
                     my buf8 $nan .= new;
-                    $nan.write-num64(0, $num64, BigEndian);
+                    $nan.write-num64(0, $_, BigEndian);
                     $nan[4] == $nan[5] == $nan[6] == $nan[7] == 0
                 };
 
-                # if $num16 == $num64 {
+                # my num16 $num16 = $num64;
+                # if $num16 == $_ {
                 #     # XXXX: write-num16 is UNAVAILABLE!
                 #     die "Cannot write a 16-bit num";
                 #
@@ -166,7 +164,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 #
                 #     # Canonify NaN sign bit to 0, even on platforms with -NaN
                 #     $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
-                #         if $num16.isNaN;
+                #         if $isnan;
                 #
                 #     $pos += 2;
                 # }
@@ -176,17 +174,17 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
 
                     # Canonify NaN sign bit to 0, even on platforms with -NaN
                     $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
-                        if $num32.isNaN;
+                        if $isnan;
 
                     $pos += 4;
                 }
                 else {
                     $buf.write-uint8($pos++, CBOR_SVal + CBOR_8Byte);
-                    $buf.write-num64($pos, $num64, BigEndian);
+                    $buf.write-num64($pos, $_, BigEndian);
 
                     # Canonify NaN sign bit to 0, even on platforms with -NaN
                     $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
-                        if $num64.isNaN;
+                        if $isnan;
 
                     $pos += 8;
                 }
