@@ -111,10 +111,11 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
 
     # Defined values
     with $value {
+        use nqp;
         # First classify by general role, then by actual type
 
         # Check for Numeric before Stringy so allomorphs prefer Numeric
-        when Numeric {
+        if nqp::istype($_, Numeric) {
             when Bool {
                 $buf.write-uint8($pos++, CBOR_SVal + ($_ ?? CBOR_True !! CBOR_False));
             }
@@ -213,7 +214,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
             }
         }
-        when Stringy {
+        elsif nqp::istype($_, Stringy) {
             when Str {
                 my $utf8  = $utf8-encoder.encode-chars($_);
                 my $bytes = $utf8.bytes;
@@ -235,11 +236,11 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             }
         }
         # XXXX: Seq/Iterator?
-        when Positional {
+        elsif nqp::istype($_, Positional) {
             write-uint(CBOR_Array, .elems);
             cbor-encode($_, $pos, $buf) for @$_;
         }
-        when Associative {
+        elsif nqp::istype($_, Associative) {
             write-uint(CBOR_Map, .elems);
             if RFC8949_Map_Key_Sort {
                 my @pairs = .map: {
@@ -259,7 +260,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 }
             }
         }
-        when Dateish {
+        elsif nqp::istype($_, Dateish) {
             when DateTime {
                 my $num = .Instant.to-posix[0].Num;
                 my $val = $num.Int == $num ?? $num.Int !! $num;
@@ -272,7 +273,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 cbor-encode(.yyyy-mm-dd, $pos, $buf);
             }
         }
-        default {
+        else {
             my $ex = "Don't know how to encode a {$value.^name}";
             $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
         }
