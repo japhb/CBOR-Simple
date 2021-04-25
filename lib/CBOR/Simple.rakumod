@@ -113,176 +113,176 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
 
     my &encode = -> $value {
     # Defined values
-    with $value {
-        # First classify by general role, then by actual type
+        with $value {
+            # First classify by general role, then by actual type
 
-        # Check for Numeric before Stringy so allomorphs prefer Numeric
-        if nqp::istype($_, Numeric) {
-            if nqp::istype($_, Bool) {
-                $buf.write-uint8($pos++, CBOR_SVal + ($_ ?? CBOR_True !! CBOR_False));
-            }
-            elsif nqp::istype($_, Int) {
-                if CBOR_Min_NInt_8Byte <= $_ <= CBOR_Max_UInt_8Byte {
-                    $_ >= 0 ?? write-uint(CBOR_UInt,   $_)
-                            !! write-uint(CBOR_NInt, +^$_);
+            # Check for Numeric before Stringy so allomorphs prefer Numeric
+            if nqp::istype($_, Numeric) {
+                if nqp::istype($_, Bool) {
+                    $buf.write-uint8($pos++, CBOR_SVal + ($_ ?? CBOR_True !! CBOR_False));
                 }
-                # Unsigned BigInt
-                elsif $_ >= 0 {
-                    $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_Unsigned_BigInt);
-                    my @bytes = .polymod(256 xx *).reverse;
-                    my $bytes = @bytes.elems;
-                    write-uint(CBOR_BStr, $bytes);
-                    $buf.splice($pos, $bytes, @bytes);
+                elsif nqp::istype($_, Int) {
+                    if CBOR_Min_NInt_8Byte <= $_ <= CBOR_Max_UInt_8Byte {
+                        $_ >= 0 ?? write-uint(CBOR_UInt,   $_)
+                                !! write-uint(CBOR_NInt, +^$_);
+                    }
+                    # Unsigned BigInt
+                    elsif $_ >= 0 {
+                        $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_Unsigned_BigInt);
+                        my @bytes = .polymod(256 xx *).reverse;
+                        my $bytes = @bytes.elems;
+                        write-uint(CBOR_BStr, $bytes);
+                        $buf.splice($pos, $bytes, @bytes);
+                        $pos += $bytes;
+                    }
+                    # Negative BigInt
+                    else {
+                        $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_Negative_BigInt);
+                        my @bytes = (+^$_).polymod(256 xx *).reverse;
+                        my $bytes = @bytes.elems;
+                        write-uint(CBOR_BStr, $bytes);
+                        $buf.splice($pos, $bytes, @bytes);
+                        $pos += $bytes;
+                    }
+                }
+                elsif nqp::istype($_, Num) {
+                    my $isnan = .isNaN;
+                    my num32 $num32 = $_;
+
+                    my $use32 = $num32 == $_ || $isnan && do {
+                        my buf8 $nan .= new;
+                        $nan.write-num64(0, $_, BigEndian);
+                        $nan[4] == $nan[5] == $nan[6] == $nan[7] == 0
+                    };
+
+                    # my num16 $num16 = $num64;
+                    # if $num16 == $_ {
+                    #     # XXXX: write-num16 is UNAVAILABLE!
+                    #     die "Cannot write a 16-bit num";
+                    #
+                    #     $buf.write-uint8($pos++, CBOR_SVal + CBOR_2Byte);
+                    #     $buf.write-num16($pos, $num16, BigEndian);
+                    #
+                    #     # Canonify NaN sign bit to 0, even on platforms with -NaN
+                    #     $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
+                    #         if $isnan;
+                    #
+                    #     $pos += 2;
+                    # }
+                    if $use32 {
+                        $buf.write-uint8($pos++, CBOR_SVal + CBOR_4Byte);
+                        $buf.write-num32($pos, $num32, BigEndian);
+
+                        # Canonify NaN sign bit to 0, even on platforms with -NaN
+                        $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
+                            if $isnan;
+
+                        $pos += 4;
+                    }
+                    else {
+                        $buf.write-uint8($pos++, CBOR_SVal + CBOR_8Byte);
+                        $buf.write-num64($pos, $_, BigEndian);
+
+                        # Canonify NaN sign bit to 0, even on platforms with -NaN
+                        $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
+                            if $isnan;
+
+                        $pos += 8;
+                    }
+                }
+                elsif nqp::istype($_, Rational) {
+                    # write-uint(CBOR_Tag, CBOR_Tag_Rational);
+                    $buf.write-uint8($pos++, CBOR_Tag + CBOR_1Byte);
+                    $buf.write-uint8($pos++, CBOR_Tag_Rational);
+                    $buf.write-uint8($pos++, CBOR_Array + 2);
+                    encode(.numerator);
+                    encode(.denominator);
+                }
+                elsif nqp::istype($_, Instant) {
+                    my $num = .to-posix[0].Num;
+                    my $val = $num.Int == $num ?? $num.Int !! $num;
+
+                    $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
+                    encode($val);
+                }
+                elsif nqp::istype($_, Real) {
+                    # XXXX: Pretend any other Real is a Num
+                    encode(.Num);
+                }
+                else {
+                    my $ex = "Don't know how to encode a {$value.^name}";
+                    $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
+                }
+            }
+            elsif nqp::istype($_, Stringy) {
+                if nqp::istype($_, Str) {
+                    my $utf8  = $utf8-encoder.encode-chars($_);
+                    my $bytes = $utf8.bytes;
+
+                    write-uint(CBOR_TStr, $bytes);
+                    $buf.splice($pos, $bytes, $utf8);
                     $pos += $bytes;
                 }
-                # Negative BigInt
-                else {
-                    $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_Negative_BigInt);
-                    my @bytes = (+^$_).polymod(256 xx *).reverse;
-                    my $bytes = @bytes.elems;
+                elsif nqp::istype($_, Blob) {
+                    my $bytes = .bytes;
+
                     write-uint(CBOR_BStr, $bytes);
-                    $buf.splice($pos, $bytes, @bytes);
+                    $buf.splice($pos, $bytes, $_);
                     $pos += $bytes;
                 }
+                else {
+                    my $ex = "Don't know how to encode a {$value.^name}";
+                    $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
+                }
             }
-            elsif nqp::istype($_, Num) {
-                my $isnan = .isNaN;
-                my num32 $num32 = $_;
-
-                my $use32 = $num32 == $_ || $isnan && do {
-                    my buf8 $nan .= new;
-                    $nan.write-num64(0, $_, BigEndian);
-                    $nan[4] == $nan[5] == $nan[6] == $nan[7] == 0
-                };
-
-                # my num16 $num16 = $num64;
-                # if $num16 == $_ {
-                #     # XXXX: write-num16 is UNAVAILABLE!
-                #     die "Cannot write a 16-bit num";
-                #
-                #     $buf.write-uint8($pos++, CBOR_SVal + CBOR_2Byte);
-                #     $buf.write-num16($pos, $num16, BigEndian);
-                #
-                #     # Canonify NaN sign bit to 0, even on platforms with -NaN
-                #     $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
-                #         if $isnan;
-                #
-                #     $pos += 2;
-                # }
-                if $use32 {
-                    $buf.write-uint8($pos++, CBOR_SVal + CBOR_4Byte);
-                    $buf.write-num32($pos, $num32, BigEndian);
-
-                    # Canonify NaN sign bit to 0, even on platforms with -NaN
-                    $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
-                        if $isnan;
-
-                    $pos += 4;
+            # XXXX: Seq/Iterator?
+            elsif nqp::istype($_, Positional) {
+                write-uint(CBOR_Array, .elems);
+                encode($_) for @$_;
+            }
+            elsif nqp::istype($_, Associative) {
+                write-uint(CBOR_Map, .elems);
+                if RFC8949_Map_Key_Sort {
+                    my @pairs = .map: {
+                        cbor-encode(.key, my $ = 0) => .value
+                    };
+                    @pairs.sort(*.key).map: {
+                        my $bytes = .key.bytes;
+                        $buf.splice($pos, $bytes, .key);
+                        $pos += $bytes;
+                        encode(.value);
+                    }
                 }
                 else {
-                    $buf.write-uint8($pos++, CBOR_SVal + CBOR_8Byte);
-                    $buf.write-num64($pos, $_, BigEndian);
-
-                    # Canonify NaN sign bit to 0, even on platforms with -NaN
-                    $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
-                        if $isnan;
-
-                    $pos += 8;
+                    for .sort {
+                        encode(.key);
+                        encode(.value);
+                    }
                 }
             }
-            elsif nqp::istype($_, Rational) {
-                # write-uint(CBOR_Tag, CBOR_Tag_Rational);
-                $buf.write-uint8($pos++, CBOR_Tag + CBOR_1Byte);
-                $buf.write-uint8($pos++, CBOR_Tag_Rational);
-                $buf.write-uint8($pos++, CBOR_Array + 2);
-                encode(.numerator);
-                encode(.denominator);
-            }
-            elsif nqp::istype($_, Instant) {
-                my $num = .to-posix[0].Num;
-                my $val = $num.Int == $num ?? $num.Int !! $num;
+            elsif nqp::istype($_, Dateish) {
+                if nqp::istype($_, DateTime) {
+                    my $num = .Instant.to-posix[0].Num;
+                    my $val = $num.Int == $num ?? $num.Int !! $num;
 
-                $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
-                encode($val);
-            }
-            elsif nqp::istype($_, Real) {
-                # XXXX: Pretend any other Real is a Num
-                encode(.Num);
+                    $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
+                    encode($val);
+                }
+                else {
+                    $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_String);
+                    encode(.yyyy-mm-dd);
+                }
             }
             else {
                 my $ex = "Don't know how to encode a {$value.^name}";
                 $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
             }
         }
-        elsif nqp::istype($_, Stringy) {
-            if nqp::istype($_, Str) {
-                my $utf8  = $utf8-encoder.encode-chars($_);
-                my $bytes = $utf8.bytes;
-
-                write-uint(CBOR_TStr, $bytes);
-                $buf.splice($pos, $bytes, $utf8);
-                $pos += $bytes;
-            }
-            elsif nqp::istype($_, Blob) {
-                my $bytes = .bytes;
-
-                write-uint(CBOR_BStr, $bytes);
-                $buf.splice($pos, $bytes, $_);
-                $pos += $bytes;
-            }
-            else {
-                my $ex = "Don't know how to encode a {$value.^name}";
-                $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
-            }
-        }
-        # XXXX: Seq/Iterator?
-        elsif nqp::istype($_, Positional) {
-            write-uint(CBOR_Array, .elems);
-            encode($_) for @$_;
-        }
-        elsif nqp::istype($_, Associative) {
-            write-uint(CBOR_Map, .elems);
-            if RFC8949_Map_Key_Sort {
-                my @pairs = .map: {
-                    cbor-encode(.key, my $ = 0) => .value
-                };
-                @pairs.sort(*.key).map: {
-                    my $bytes = .key.bytes;
-                    $buf.splice($pos, $bytes, .key);
-                    $pos += $bytes;
-                    encode(.value);
-                }
-            }
-            else {
-                for .sort {
-                    encode(.key);
-                    encode(.value);
-                }
-            }
-        }
-        elsif nqp::istype($_, Dateish) {
-            if nqp::istype($_, DateTime) {
-                my $num = .Instant.to-posix[0].Num;
-                my $val = $num.Int == $num ?? $num.Int !! $num;
-
-                $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
-                encode($val);
-            }
-            else {
-                $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_String);
-                encode(.yyyy-mm-dd);
-            }
-        }
+        # Undefined values
         else {
-            my $ex = "Don't know how to encode a {$value.^name}";
-            $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
+            # Any:U is CBOR null, other Mu:U is CBOR undefined
+            $buf.write-uint8($pos++, CBOR_SVal + (nqp::istype($value, Any) ?? CBOR_Null !! CBOR_Undef));
         }
-    }
-    # Undefined values
-    else {
-        # Any:U is CBOR null, other Mu:U is CBOR undefined
-        $buf.write-uint8($pos++, CBOR_SVal + (nqp::istype($value, Any) ?? CBOR_Null !! CBOR_Undef));
-    }
     }
 
     encode($value);
