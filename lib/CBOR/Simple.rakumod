@@ -400,20 +400,16 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             }
         }
         elsif $major-type == CBOR_Array {
-            my $elems = read-uint(True);
-
             # Indefinite length
-            if $elems === Whatever {
+            $argument == CBOR_Indefinite_Break
+            ?? do {
                 my @array;
                 until (my $item := cbor-decode($cbor, $pos, :breakable)) =:= Break {
                     @array.push($item);
                 }
                 @array
             }
-            # Definite length
-            else {
-                my @ = (^$elems).map(&decode)
-            }
+            !! my @ = (^read-uint).map(&decode)
         }
         elsif $major-type == CBOR_Map {
             my $elems = read-uint(True);
