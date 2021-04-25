@@ -1,4 +1,4 @@
-unit module CBOR::Simple:auth<zef:japhb>:api<0>:ver<0.0.3>;
+unit module CBOR::Simple:auth<zef:japhb>:api<0>:ver<0.0.4>;
 
 use nqp;
 

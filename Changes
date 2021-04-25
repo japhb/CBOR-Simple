@@ -1,5 +1,11 @@
 Revision history for CBOR-Simple
 
+0.0.4  2022-04-24
+  - perf-test script added to tools/
+  - More general performance optimization
+  - Now requires nqp for nqp::istype (which sped type testing quite a bit)
+
+
 0.0.3  2022-04-22
   - Low-hanging fruit performance optimizations
   - Enum and magic number reform
