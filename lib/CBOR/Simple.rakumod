@@ -441,17 +441,31 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         }
         elsif $major-type == CBOR_Tag {
             my $tag-number = read-uint;
-            if $tag-number == CBOR_Tag_DateTime_String {
-                my $dt := cbor-decode($cbor, $pos);
-                fail-malformed "DateTime tag (0) does not contain a string"
-                    unless nqp::istype($dt, Str);
-                DateTime.new($dt) // fail-malformed "DateTime string could not be parsed"
+            if $tag-number == CBOR_Tag_Rational {
+                fail-malformed "Rational tag (30) does not contain an array with exactly two elements"
+                    unless $cbor.read-uint8($pos++) == CBOR_Array + 2;
+
+                my $nu = decode;
+                my $de = decode;
+                fail-malformed "Rational tag (30) numerator is not an integer"
+                    unless nqp::istype($nu, Int);
+                fail-malformed "Rational tag (30) denominator is not a positive integer"
+                    unless nqp::istype($de, Int) && $de > 0;
+
+                $de < 18446744073709551616 ?? Rat.new(   $nu, $de)
+                                           !! FatRat.new($nu, $de)
             }
             elsif $tag-number == CBOR_Tag_DateTime_Number {
                 my $seconds := cbor-decode($cbor, $pos);
                 fail-malformed "Epoch DateTime tag(1) does not contain a real number"
                     unless nqp::istype($seconds, Real);
                 DateTime.new($seconds) // fail-malformed "Epoch DateTime could not be decoded"
+            }
+            elsif $tag-number == CBOR_Tag_DateTime_String {
+                my $dt := cbor-decode($cbor, $pos);
+                fail-malformed "DateTime tag (0) does not contain a string"
+                    unless nqp::istype($dt, Str);
+                DateTime.new($dt) // fail-malformed "DateTime string could not be parsed"
             }
             elsif $tag-number == CBOR_Tag_Unsigned_BigInt {
                 my $bytes := cbor-decode($cbor, $pos);
@@ -471,22 +485,6 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             }
 
             # XXXX: skipped tags 4, 5, 16..18, 21..29
-
-            elsif $tag-number == CBOR_Tag_Rational {
-                fail-malformed "Rational tag (30) does not contain an array with exactly two elements"
-                    unless $cbor.read-uint8($pos++) == CBOR_Array + 2;
-
-                my $nu = decode;
-                my $de = decode;
-                fail-malformed "Rational tag (30) numerator is not an integer"
-                    unless nqp::istype($nu, Int);
-                fail-malformed "Rational tag (30) denominator is not a positive integer"
-                    unless nqp::istype($de, Int) && $de > 0;
-
-                $de < 18446744073709551616 ?? Rat.new(   $nu, $de)
-                                           !! FatRat.new($nu, $de)
-            }
-
             # XXXX: Handle more special tags
 
             else {
