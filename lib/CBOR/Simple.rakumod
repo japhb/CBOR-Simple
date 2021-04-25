@@ -349,13 +349,9 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         my $major-type   = $initial-byte +& CBOR_MajorType_Mask;
         $argument = $initial-byte +& CBOR_Argument_Mask;
 
-        if $major-type == CBOR_UInt {
-            read-uint
-        }
-        elsif $major-type == CBOR_NInt {
-            +^read-uint
-        }
-        elsif $major-type == CBOR_BStr {
+        $major-type == CBOR_UInt ??   read-uint() !!
+        $major-type == CBOR_NInt ?? +^read-uint() !!
+        do if $major-type == CBOR_BStr {
             my $bytes = read-uint(!$breakable);
 
             # Indefinite length
