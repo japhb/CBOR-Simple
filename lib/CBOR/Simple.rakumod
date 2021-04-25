@@ -1,5 +1,7 @@
 unit module CBOR::Simple:auth<zef:japhb>:api<0>:ver<0.0.3>;
 
+use nqp;
+
 
 enum CBORMajorType (
     CBOR_UInt  => 0,
@@ -111,7 +113,6 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
 
     # Defined values
     with $value {
-        use nqp;
         # First classify by general role, then by actual type
 
         # Check for Numeric before Stringy so allomorphs prefer Numeric
@@ -478,9 +479,9 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 my $nu = decode;
                 my $de = decode;
                 fail-malformed "Rational tag (30) numerator is not an integer"
-                    unless $nu ~~ Int:D;
-                fail-malformed "Rational tag (30) denominator is not an unsigned integer"
-                    unless $de ~~ UInt:D;
+                    unless nqp::istype($nu, Int);
+                fail-malformed "Rational tag (30) denominator is not a positive integer"
+                    unless nqp::istype($de, Int) && $de > 0;
 
                 $de < 18446744073709551616 ?? Rat.new(   $nu, $de)
                                            !! FatRat.new($nu, $de)
