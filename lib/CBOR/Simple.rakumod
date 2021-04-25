@@ -440,58 +440,56 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         }
         elsif $major-type == CBOR_Tag {
             my $tag-number = read-uint;
-            given $tag-number {
-                when CBOR_Tag_DateTime_String {
-                    my $dt := cbor-decode($cbor, $pos);
-                    fail-malformed "DateTime tag (0) does not contain a string"
-                        unless $dt ~~ Str:D;
-                    DateTime.new($dt) // fail-malformed "DateTime string could not be parsed"
-                }
-                when CBOR_Tag_DateTime_Number {
-                    my $seconds := cbor-decode($cbor, $pos);
-                    fail-malformed "Epoch DateTime tag(1) does not contain a real number"
-                        unless $seconds ~~ Real:D;
-                    DateTime.new($seconds) // fail-malformed "Epoch DateTime could not be decoded"
-                }
-                when CBOR_Tag_Unsigned_BigInt {
-                    my $bytes := cbor-decode($cbor, $pos);
-                    fail-malformed "Unsigned BigInt does not contain a byte string"
-                        unless $bytes ~~ Buf:D;
-                    my $value = 0;
-                    $value = $value * 256 + $_ for @$bytes;
-                    $value
-                }
-                when CBOR_Tag_Negative_BigInt {
-                    my $bytes := cbor-decode($cbor, $pos);
-                    fail-malformed "Negative BigInt does not contain a byte string"
-                        unless $bytes ~~ Buf:D;
-                    my $value = 0;
-                    $value = $value * 256 + $_ for @$bytes;
-                    +^$value
-                }
+            if $tag-number == CBOR_Tag_DateTime_String {
+                my $dt := cbor-decode($cbor, $pos);
+                fail-malformed "DateTime tag (0) does not contain a string"
+                    unless $dt ~~ Str:D;
+                DateTime.new($dt) // fail-malformed "DateTime string could not be parsed"
+            }
+            elsif $tag-number == CBOR_Tag_DateTime_Number {
+                my $seconds := cbor-decode($cbor, $pos);
+                fail-malformed "Epoch DateTime tag(1) does not contain a real number"
+                    unless $seconds ~~ Real:D;
+                DateTime.new($seconds) // fail-malformed "Epoch DateTime could not be decoded"
+            }
+            elsif $tag-number == CBOR_Tag_Unsigned_BigInt {
+                my $bytes := cbor-decode($cbor, $pos);
+                fail-malformed "Unsigned BigInt does not contain a byte string"
+                    unless $bytes ~~ Buf:D;
+                my $value = 0;
+                $value = $value * 256 + $_ for @$bytes;
+                $value
+            }
+            elsif $tag-number == CBOR_Tag_Negative_BigInt {
+                my $bytes := cbor-decode($cbor, $pos);
+                fail-malformed "Negative BigInt does not contain a byte string"
+                    unless $bytes ~~ Buf:D;
+                my $value = 0;
+                $value = $value * 256 + $_ for @$bytes;
+                +^$value
+            }
 
-                # XXXX: skipped tags 4, 5, 16..18, 21..29
+            # XXXX: skipped tags 4, 5, 16..18, 21..29
 
-                when CBOR_Tag_Rational {
-                    fail-malformed "Rational tag (30) does not contain an array with exactly two elements"
-                        unless $cbor.read-uint8($pos++) == CBOR_Array + 2;
+            elsif $tag-number == CBOR_Tag_Rational {
+                fail-malformed "Rational tag (30) does not contain an array with exactly two elements"
+                    unless $cbor.read-uint8($pos++) == CBOR_Array + 2;
 
-                    my $nu = decode;
-                    my $de = decode;
-                    fail-malformed "Rational tag (30) numerator is not an integer"
-                        unless $nu ~~ Int:D;
-                    fail-malformed "Rational tag (30) denominator is not an unsigned integer"
-                        unless $de ~~ UInt:D;
+                my $nu = decode;
+                my $de = decode;
+                fail-malformed "Rational tag (30) numerator is not an integer"
+                    unless $nu ~~ Int:D;
+                fail-malformed "Rational tag (30) denominator is not an unsigned integer"
+                    unless $de ~~ UInt:D;
 
-                    $de < 18446744073709551616 ?? Rat.new(   $nu, $de)
-                                               !! FatRat.new($nu, $de)
-                }
+                $de < 18446744073709551616 ?? Rat.new(   $nu, $de)
+                                           !! FatRat.new($nu, $de)
+            }
 
-                # XXXX: Handle more special tags
+            # XXXX: Handle more special tags
 
-                default {
-                    Tagged.new(:$tag-number, :value(cbor-decode($cbor, $pos)))
-                }
+            else {
+                Tagged.new(:$tag-number, :value(cbor-decode($cbor, $pos)))
             }
         }
         else { # $major-type == CBOR_SVal
