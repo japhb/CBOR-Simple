@@ -111,6 +111,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
         }
     }
 
+    my &encode = -> $value {
     # Defined values
     with $value {
         # First classify by general role, then by actual type
@@ -194,19 +195,19 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 $buf.write-uint8($pos++, CBOR_Tag + CBOR_1Byte);
                 $buf.write-uint8($pos++, CBOR_Tag_Rational);
                 $buf.write-uint8($pos++, CBOR_Array + 2);
-                cbor-encode(.numerator,   $pos, $buf);
-                cbor-encode(.denominator, $pos, $buf);
+                encode(.numerator);
+                encode(.denominator);
             }
             elsif nqp::istype($_, Instant) {
                 my $num = .to-posix[0].Num;
                 my $val = $num.Int == $num ?? $num.Int !! $num;
 
                 $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
-                cbor-encode($val, $pos, $buf);
+                encode($val);
             }
             elsif nqp::istype($_, Real) {
                 # XXXX: Pretend any other Real is a Num
-                cbor-encode(.Num, $pos, $buf);
+                encode(.Num);
             }
             else {
                 my $ex = "Don't know how to encode a {$value.^name}";
@@ -237,7 +238,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
         # XXXX: Seq/Iterator?
         elsif nqp::istype($_, Positional) {
             write-uint(CBOR_Array, .elems);
-            cbor-encode($_, $pos, $buf) for @$_;
+            encode($_) for @$_;
         }
         elsif nqp::istype($_, Associative) {
             write-uint(CBOR_Map, .elems);
@@ -249,13 +250,13 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     my $bytes = .key.bytes;
                     $buf.splice($pos, $bytes, .key);
                     $pos += $bytes;
-                    cbor-encode(.value, $pos, $buf);
+                    encode(.value);
                 }
             }
             else {
                 for .sort {
-                    cbor-encode(.key,   $pos, $buf);
-                    cbor-encode(.value, $pos, $buf);
+                    encode(.key);
+                    encode(.value);
                 }
             }
         }
@@ -265,11 +266,11 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 my $val = $num.Int == $num ?? $num.Int !! $num;
 
                 $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
-                cbor-encode($val, $pos, $buf);
+                encode($val);
             }
             else {
                 $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_String);
-                cbor-encode(.yyyy-mm-dd, $pos, $buf);
+                encode(.yyyy-mm-dd);
             }
         }
         else {
@@ -282,7 +283,9 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
         # Any:U is CBOR null, other Mu:U is CBOR undefined
         $buf.write-uint8($pos++, CBOR_SVal + (nqp::istype($value, Any) ?? CBOR_Null !! CBOR_Undef));
     }
+    }
 
+    encode($value);
     $buf
 }
 
