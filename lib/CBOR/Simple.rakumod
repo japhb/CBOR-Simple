@@ -311,9 +311,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         default { .rethrow }
     }
 
-    my $initial-byte = $cbor.read-uint8($pos++);
-    my $major-type   = $initial-byte +& CBOR_MajorType_Mask;
-    my $argument     = $initial-byte +& CBOR_Argument_Mask;
+    my $argument;
 
     my &read-uint = -> $allow-indefinite = False {
         if $argument < CBOR_1Byte {
@@ -346,14 +344,18 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         }
     }
 
-    given $major-type {
-        when CBOR_UInt {
+    my &decode = {
+        my $initial-byte = $cbor.read-uint8($pos++);
+        my $major-type   = $initial-byte +& CBOR_MajorType_Mask;
+        $argument = $initial-byte +& CBOR_Argument_Mask;
+
+        if $major-type == CBOR_UInt {
             read-uint
         }
-        when CBOR_NInt {
+        elsif $major-type == CBOR_NInt {
             +^read-uint
         }
-        when CBOR_BStr {
+        elsif $major-type == CBOR_BStr {
             my $bytes = read-uint(!$breakable);
 
             # Indefinite length
@@ -377,7 +379,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 $buf
             }
         }
-        when CBOR_TStr {
+        elsif $major-type == CBOR_TStr {
             my $bytes = read-uint(!$breakable);
 
             # Indefinite length
@@ -401,7 +403,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 $utf8.decode
             }
         }
-        when CBOR_Array {
+        elsif $major-type == CBOR_Array {
             my $elems = read-uint(True);
 
             # Indefinite length
@@ -414,10 +416,10 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             }
             # Definite length
             else {
-                my @ = (^$elems).map: { cbor-decode($cbor, $pos) }
+                my @ = (^$elems).map(&decode)
             }
         }
-        when CBOR_Map {
+        elsif $major-type == CBOR_Map {
             my $elems = read-uint(True);
             my %str-map;
             my %mu-map{Mu};
@@ -427,14 +429,14 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 loop {
                     my $k := cbor-decode($cbor, $pos, :breakable);
                     last if $k =:= Break;
-                    ($k ~~ Str ?? %str-map !! %mu-map){$k} := cbor-decode($cbor, $pos);
+                    ($k ~~ Str ?? %str-map !! %mu-map){$k} = decode;
                 }
             }
             # Definite length
             else {
                 for ^$elems {
-                    my $k := cbor-decode($cbor, $pos);
-                    ($k ~~ Str ?? %str-map !! %mu-map){$k} := cbor-decode($cbor, $pos);
+                    my $k = decode;
+                    ($k ~~ Str ?? %str-map !! %mu-map){$k} = decode;
                 }
             }
 
@@ -446,7 +448,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 %str-map
             }
         }
-        when CBOR_Tag {
+        elsif $major-type == CBOR_Tag {
             my $tag-number = read-uint;
             given $tag-number {
                 when CBOR_Tag_DateTime_String {
@@ -484,8 +486,8 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                     fail-malformed "Rational tag (30) does not contain an array with exactly two elements"
                         unless $cbor.read-uint8($pos++) == CBOR_Array + 2;
 
-                    my $nu := cbor-decode($cbor, $pos);
-                    my $de := cbor-decode($cbor, $pos);
+                    my $nu = decode;
+                    my $de = decode;
                     fail-malformed "Rational tag (30) numerator is not an integer"
                         unless $nu ~~ Int:D;
                     fail-malformed "Rational tag (30) denominator is not an unsigned integer"
@@ -502,7 +504,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 }
             }
         }
-        when CBOR_SVal {
+        else { # $major-type == CBOR_SVal
             my constant %svals = 20 => False, 21 => True, 22 => Any, 23 => Mu;
 
             if $argument < CBOR_False {
@@ -545,6 +547,8 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             }
         }
     }
+
+    decode;
 }
 
 
