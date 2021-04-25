@@ -412,12 +412,11 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             !! my @ = (^read-uint).map(&decode)
         }
         elsif $major-type == CBOR_Map {
-            my $elems = read-uint(True);
             my %str-map;
             my %mu-map{Mu};
 
             # Indefinite length
-            if $elems === Whatever {
+            if $argument == CBOR_Indefinite_Break {
                 loop {
                     my $k := cbor-decode($cbor, $pos, :breakable);
                     last if $k =:= Break;
@@ -426,10 +425,8 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             }
             # Definite length
             else {
-                for ^$elems {
-                    my $k = decode;
-                    ($k ~~ Str ?? %str-map !! %mu-map){$k} = decode;
-                }
+                ((my $k = decode) ~~ Str ?? %str-map !! %mu-map){$k} = decode
+                    for ^read-uint;
             }
 
             if %mu-map.elems {
