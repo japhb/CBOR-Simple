@@ -282,7 +282,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
     # Undefined values
     else {
         # Any:U is CBOR null, other Mu:U is CBOR undefined
-        $buf.write-uint8($pos++, CBOR_SVal + ($value ~~ Any ?? CBOR_Null !! CBOR_Undef));
+        $buf.write-uint8($pos++, CBOR_SVal + (nqp::istype($value, Any) ?? CBOR_Null !! CBOR_Undef));
     }
 
     $buf
@@ -361,7 +361,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 my buf8 $joined .= new;
                 until (my $chunk := cbor-decode($cbor, $pos, :breakable)) =:= Break {
                     fail-malformed "Byte string chunk has wrong type"
-                        unless $chunk ~~ Buf:D;
+                        unless nqp::istype($chunk, Buf);
                     $joined.append($chunk);
                 }
                 $joined
@@ -385,7 +385,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 my @chunks;
                 until (my $chunk := cbor-decode($cbor, $pos, :breakable)) =:= Break {
                     fail-malformed "Text string chunk has wrong type"
-                        unless $chunk ~~ Str:D;
+                        unless nqp::istype($chunk, Str);
                     @chunks.push($chunk);
                 }
                 @chunks.join
@@ -422,12 +422,12 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 loop {
                     my $k := cbor-decode($cbor, $pos, :breakable);
                     last if $k =:= Break;
-                    ($k ~~ Str ?? %str-map !! %mu-map){$k} = decode;
+                    (nqp::istype($k, Str) ?? %str-map !! %mu-map){$k} = decode;
                 }
             }
             # Definite length
             else {
-                ((my $k = decode) ~~ Str ?? %str-map !! %mu-map){$k} = decode
+                (nqp::istype((my $k = decode), Str) ?? %str-map !! %mu-map){$k} = decode
                     for ^read-uint;
             }
 
@@ -444,19 +444,19 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             if $tag-number == CBOR_Tag_DateTime_String {
                 my $dt := cbor-decode($cbor, $pos);
                 fail-malformed "DateTime tag (0) does not contain a string"
-                    unless $dt ~~ Str:D;
+                    unless nqp::istype($dt, Str);
                 DateTime.new($dt) // fail-malformed "DateTime string could not be parsed"
             }
             elsif $tag-number == CBOR_Tag_DateTime_Number {
                 my $seconds := cbor-decode($cbor, $pos);
                 fail-malformed "Epoch DateTime tag(1) does not contain a real number"
-                    unless $seconds ~~ Real:D;
+                    unless nqp::istype($seconds, Real);
                 DateTime.new($seconds) // fail-malformed "Epoch DateTime could not be decoded"
             }
             elsif $tag-number == CBOR_Tag_Unsigned_BigInt {
                 my $bytes := cbor-decode($cbor, $pos);
                 fail-malformed "Unsigned BigInt does not contain a byte string"
-                    unless $bytes ~~ Buf:D;
+                    unless nqp::istype($bytes, Buf);
                 my $value = 0;
                 $value = $value * 256 + $_ for @$bytes;
                 $value
@@ -464,7 +464,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             elsif $tag-number == CBOR_Tag_Negative_BigInt {
                 my $bytes := cbor-decode($cbor, $pos);
                 fail-malformed "Negative BigInt does not contain a byte string"
-                    unless $bytes ~~ Buf:D;
+                    unless nqp::istype($bytes, Buf);
                 my $value = 0;
                 $value = $value * 256 + $_ for @$bytes;
                 +^$value
