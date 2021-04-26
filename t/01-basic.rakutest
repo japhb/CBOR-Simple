@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 76;
+plan 87;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -83,12 +83,17 @@ matches -1000, '3903e7';
 
 # FLOATS
 
-# XXXX: Requires 16-bit nums
+# XXXX: Requires write support for 16-bit nums
 # matches   0.0e0, 'f90000';
 # matches  -0.0e0, 'f98000';
 # matches   1.0e0, 'f93c00';
 # matches   1.5e0, 'f93e00';
 # matches 65504e0, 'f97bff';
+decodes-to   0.0e0, 'f90000';
+decodes-to  -0.0e0, 'f98000';
+decodes-to   1.0e0, 'f93c00';
+decodes-to   1.5e0, 'f93e00';
+decodes-to 65504e0, 'f97bff';
 
 matches    1.1e0, 'fb3ff199999999999a';
 matches 100000e0, 'fa47c35000';
@@ -96,14 +101,21 @@ matches 3.4028234663852886e+38, 'fa7f7fffff';
 matches 1.0e+300, 'fb7e37e43c8800759c';
 matches   -4.1e0, 'fbc010666666666666';
 
-# XXXX: Requires 16-bit nums
+# XXXX: Requires write support for 16-bit nums
 # matches 5.960464477539063e-8, 'f90001';
 # matches 0.00006103515625e0,   'f90400';
+decodes-to 5.960464477539063e-8, 'f90001';
+decodes-to 0.00006103515625e0,   'f90400';
 
+# XXXX: Requires write support for 16-bit nums
 # matches -4.0e0, 'f9c400';
 # matches    Inf, 'f97c00';
 # matches    NaN, 'f97e00';
 # matches   -Inf, 'f9fc00';
+decodes-to -4.0e0, 'f9c400';
+decodes-to    Inf, 'f97c00';
+decodes-to    NaN, 'f97e00';
+decodes-to   -Inf, 'f9fc00';
 
 # Current state: No 16-bit num support, so these all produce 32-bit output.
 # XXXX: This isn't ideal (all should produce 16-bit output), but it's not

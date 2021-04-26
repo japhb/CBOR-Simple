@@ -1,6 +1,7 @@
 unit module CBOR::Simple:auth<zef:japhb>:api<0>:ver<0.0.4>;
 
 use nqp;
+use TinyFloats;
 
 
 enum CBORMajorType (
@@ -155,18 +156,11 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                         $nan[4] == $nan[5] == $nan[6] == $nan[7] == 0
                     };
 
-                    # my num16 $num16 = $num64;
-                    # if $num16 == $_ {
-                    #     # XXXX: write-num16 is UNAVAILABLE!
-                    #     die "Cannot write a 16-bit num";
-                    #
+                    # my $bin16 = bin16-from-num($_);
+                    # my $num16 = num-from-bin16($bin16);
+                    # if $num16 == $_ {  # XXXX: What about NaN?
                     #     $buf.write-uint8($pos++, CBOR_SVal + CBOR_2Byte);
-                    #     $buf.write-num16($pos, $num16, BigEndian);
-                    #
-                    #     # Canonify NaN sign bit to 0, even on platforms with -NaN
-                    #     $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
-                    #         if $isnan;
-                    #
+                    #     $buf.write-uint16($pos, $bin16, BigEndian);
                     #     $pos += 2;
                     # }
                     if $use32 {
@@ -509,10 +503,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 fail-malformed "$fail simple value $val";
             }
             elsif $argument == CBOR_2Byte {
-                # XXXX: read-num16 is UNAVAILABLE!
-                die "Cannot read a 16-bit num";
-
-                my $v = $cbor.read-num16($pos, BigEndian);
+                my $v = num-from-bin16($cbor.read-uint16($pos, BigEndian));
                 $pos += 2;
                 $v
             }

@@ -1,5 +1,9 @@
 Revision history for CBOR-Simple
 
+0.0.5  *WIP*
+  - Support parsing 16-bit floats, using the new TinyFloats module
+
+
 0.0.4  2022-04-24
   - perf-test script added to tools/
   - More general performance optimization

@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 93;
+plan 94;
 
 
 # Failure can get "hidden" deep inside decoded structures, so fatalize instead
@@ -22,10 +22,7 @@ sub malformed(Str:D $cbor, Str:D $reason) {
 malformed($_, "End of input in a head") for
     < 18 19 1a 1b 1901 1a0102 1b01020304050607
       38 58 78 98             9a01ff00
-      b8 d8 f8         fa0000 fb000000 >;
-
-# XXXX: Requires 16-bit floats
-# malformed($_, "End of input in a head") for < f900 >;
+      b8 d8 f8    f900 fa0000 fb000000 >;
 
 malformed($_, "Definite-length strings with short data") for
     < 41 61 5affffffff00 5bffffffffffffffff010203
