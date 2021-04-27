@@ -449,7 +449,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 fail-malformed "Rational tag (30) denominator is not a positive integer"
                     unless nqp::istype($de, Int) && $de > 0;
 
-                $de < 18446744073709551616 ?? Rat.new(   $nu, $de)
+                $de <= CBOR_Max_UInt_8Byte ?? Rat.new(   $nu, $de)
                                            !! FatRat.new($nu, $de)
             }
             elsif $tag-number == CBOR_Tag_DateTime_Number {
@@ -491,8 +491,11 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 fail-malformed "Decimal Fraction tag (4) mantissa is not an integer"
                     unless nqp::istype($man, Int);
 
-                $exp < 0 ?? $man / 10 ** -$exp
-                         !! $man * 10 **  $exp;
+                $exp >= 0 ?? $man * 10 ** $exp !! do {
+                    my $de = 10 ** -$exp;
+                    $de <= CBOR_Max_UInt_8Byte ?? Rat.new(   $man, $de)
+                                               !! FatRat.new($man, $de)
+                }
             }
             elsif $tag-number == CBOR_Tag_Bigfloat {
                 fail-malformed "Bigfloat tag (5) does not contain an array with exactly two elements"
@@ -505,8 +508,11 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 fail-malformed "Bigfloat tag (5) mantissa is not an integer"
                     unless nqp::istype($man, Int);
 
-                $exp < 0 ?? $man / 2 ** -$exp
-                         !! $man * 2 **  $exp;
+                $exp >= 0 ?? $man * 2 ** $exp !! do {
+                    my $de = 2 ** -$exp;
+                    $de <= CBOR_Max_UInt_8Byte ?? Rat.new(   $man, $de)
+                                               !! FatRat.new($man, $de)
+                }
             }
 
             # XXXX: skipped tags 16..18, 21..29
