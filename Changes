@@ -1,5 +1,9 @@
 Revision history for CBOR-Simple
 
+0.0.6  *WIP*
+  - Support decoding Decimal Fraction (4) and Bigfloat (5) tags
+
+
 0.0.5  2021-04-26
   - Support parsing 16-bit floats, using the new TinyFloats module
 

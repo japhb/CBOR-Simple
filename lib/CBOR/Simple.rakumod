@@ -46,11 +46,13 @@ enum CBORMagicNumber (
 
 
 enum CBORTagNumber (
-    CBOR_Tag_DateTime_String => 0,
-    CBOR_Tag_DateTime_Number => 1,
-    CBOR_Tag_Unsigned_BigInt => 2,
-    CBOR_Tag_Negative_BigInt => 3,
-    CBOR_Tag_Rational        => 30,
+    CBOR_Tag_DateTime_String  => 0,
+    CBOR_Tag_DateTime_Number  => 1,
+    CBOR_Tag_Unsigned_BigInt  => 2,
+    CBOR_Tag_Negative_BigInt  => 3,
+    CBOR_Tag_Decimal_Fraction => 4,
+    CBOR_Tag_Bigfloat         => 5,
+    CBOR_Tag_Rational         => 30,
 );
 
 
@@ -478,8 +480,36 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 $value = $value * 256 + $_ for @$bytes;
                 +^$value
             }
+            elsif $tag-number == CBOR_Tag_Decimal_Fraction {
+                fail-malformed "Decimal Fraction tag (4) does not contain an array with exactly two elements"
+                    unless $cbor.read-uint8($pos++) == CBOR_Array + 2;
 
-            # XXXX: skipped tags 4, 5, 16..18, 21..29
+                my $exp = decode;
+                my $man = decode;
+                fail-malformed "Decimal Fraction tag (4) exponent is not an integer"
+                    unless nqp::istype($exp, Int);
+                fail-malformed "Decimal Fraction tag (4) mantissa is not an integer"
+                    unless nqp::istype($man, Int);
+
+                $exp < 0 ?? $man / 10 ** -$exp
+                         !! $man * 10 **  $exp;
+            }
+            elsif $tag-number == CBOR_Tag_Bigfloat {
+                fail-malformed "Bigfloat tag (5) does not contain an array with exactly two elements"
+                    unless $cbor.read-uint8($pos++) == CBOR_Array + 2;
+
+                my $exp = decode;
+                my $man = decode;
+                fail-malformed "Bigfloat tag (5) exponent is not an integer"
+                    unless nqp::istype($exp, Int);
+                fail-malformed "Bigfloat tag (5) mantissa is not an integer"
+                    unless nqp::istype($man, Int);
+
+                $exp < 0 ?? $man / 2 ** -$exp
+                         !! $man * 2 **  $exp;
+            }
+
+            # XXXX: skipped tags 16..18, 21..29
             # XXXX: Handle more special tags
 
             else {
