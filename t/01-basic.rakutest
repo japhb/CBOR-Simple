@@ -147,8 +147,8 @@ matches Mu,    'f7';
 
 decodes-to DateTime.new("2013-03-21T20:04:00Z"),
            'c074323031332d30332d32315432303a30343a30305a';
-matches DateTime.new(1363896240),   'c11a514b67b0';
-matches DateTime.new(1363896240.5), 'c1fb41d452d9ec200000';
+matches Instant.from-posix(1363896240),   'c11a514b67b0';
+matches Instant.from-posix(1363896240.5), 'c1fb41d452d9ec200000';
 
 # Decimal Fraction/Bigfloat tests from https://tools.ietf.org/html/rfc8949#section-3.4.4
 decodes-to 273.15, 'c48221196ab3';

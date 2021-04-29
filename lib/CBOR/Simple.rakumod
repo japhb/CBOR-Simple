@@ -456,7 +456,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 my $seconds := cbor-decode($cbor, $pos);
                 fail-malformed "Epoch DateTime tag(1) does not contain a real number"
                     unless nqp::istype($seconds, Real);
-                DateTime.new($seconds) // fail-malformed "Epoch DateTime could not be decoded"
+                Instant.from-posix($seconds) // fail-malformed "Epoch DateTime could not be decoded"
             }
             elsif $tag-number == CBOR_Tag_DateTime_String {
                 my $dt := cbor-decode($cbor, $pos);
