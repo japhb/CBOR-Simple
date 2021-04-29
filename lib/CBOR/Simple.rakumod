@@ -640,22 +640,35 @@ CBOR::Simple is a trivial implementation of the core functionality of the
 L<CBOR serialization format|https://cbor.io/>, implementing the standard as of
 L<RFC 8949|https://tools.ietf.org/html/rfc8949>.
 
+
+=head2 NYI
+
 Currently known NOT to work:
 
-=item 16-bit floats (num16)
+=item Encoding 16-bit floats (num16) -- decoding num16 works
 
-=item Special decoding for registered tags other than numbers 0..3 and 30
+=item Special decoding for registered tags other than numbers 0..5 and 30
 
 
-=head2 SPECIAL CASES
+=head2 DATETIME AND INSTANT
+
+Raku's builtin time handling is richer than the default CBOR data model, so the
+following mappings apply:
+
+=item C<Instant> and C<DateTime> are both written as tag 1 (epoch-based date/time)
+
+=item Other C<Dateish> are written as tag 0 (date/time string)
+
+=item Tag 0 (date/time string) is parsed as C<DateTime>
+
+=item Tag 1 (epoch-based date/time) is parsed via C<Instant.from-posix()>
+
+
+=head2 OTHER SPECIAL CASES
 
 =item CBOR's C<null> is translated as C<Any> in Raku
 
 =item CBOR's C<undefined> is translated as C<Mu> in Raku
-
-=item C<Instant> and C<DateTime> are both written as tag 1 (epoch-based date/time)
-
-=item Both tag 0 (date/time string) and tag 1 (epoch-based date/time) are read as C<DateTime>
 
 =item CBOR strings claiming to be longer than C<2⁶‭³‭-1> are treated as malformed
 
