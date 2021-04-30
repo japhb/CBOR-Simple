@@ -648,7 +648,7 @@ multi cbor-diagnostic(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False
                 my $buf = $cbor.subbuf($pos, $bytes);
                 if $buf.bytes == $bytes {
                     $pos += $bytes;
-                    "h'" ~ $buf.list.map(*.base(16)) ~ "'"
+                    "h'" ~ $buf.list.map(*.fmt('%02x')).join ~ "'"
                 }
                 else {
                     "'Byte string too short, {$buf.bytes} < $bytes bytes'"
@@ -731,7 +731,10 @@ multi cbor-diagnostic(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False
             sub JS-Num($v) {
                 $v.isNaN   ??  'NaN'      !!
                 $v ==  Inf ??  'Infinity' !!
-                $v == -Inf ?? '-Infinity' !! ~$v
+                $v == -Inf ?? '-Infinity' !! do {
+                    my $basic = (~$v).subst(/'e0'$/, '').subst(/'e'('+'|'-')'0'/, {"e$0"});
+                    $basic.contains('.') ?? $basic !! $basic.subst(/('e' | $)/, {".0$0"})
+                }
             }
 
             if $argument < CBOR_False {

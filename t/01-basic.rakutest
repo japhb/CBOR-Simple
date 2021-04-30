@@ -44,7 +44,7 @@ multi decodes-to(Mu $value, Str:D $cbor) {
 #| Unidirectional DEcoding testing, from an actual CBOR blob
 multi decodes-to(Mu $value, Buf:D $cbor) {
     my $as-value = cbor-decode($cbor);
-    my $as-hex   = $cbor.map(*.base(16)).join;
+    my $as-hex   = $cbor.map(*.fmt('%02X')).join;
 
     if $value ~~ Any {
         is-deeply $as-value, $value, "cbor-decode($as-hex) produces correct value"
