@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 90;
+plan 91;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -172,6 +172,10 @@ matches FatRat.new(-18446744073709551615, 18446744073709551616),
 
 # Tag 55799: Self-describing CBOR
 decodes-to 100, 'd9d9f71864';
+my $as-cbor = cbor-encode(123, :cbor-self-tag);
+is-deeply $as-cbor, buf8.new('d9d9f7187b'.comb(2).map(*.parse-base(16))),
+          "cbor-encode(123, :cbor-self-tag) produces correct blob";
+
 
 # XXXX: Other known tags
 
