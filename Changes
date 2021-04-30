@@ -1,7 +1,17 @@
 Revision history for CBOR-Simple
 
 0.0.6  *WIP*
+  [Diagnostics]
+  - Add cbor-diagnostic($cbor) routine to decode into text diagnostics
+  - Add RFC 8949 Appendix A diagnostic tests
+
+  [Tags]
   - Support decoding Decimal Fraction (4) and Bigfloat (5) tags
+  - Support 'self-describing CBOR' tag (55799)
+  - Switch epoch time tag (1) to decode as Instant
+
+  [Docs]
+  - Improve README
 
 
 0.0.5  2021-04-26
