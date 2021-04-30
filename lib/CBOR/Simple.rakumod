@@ -580,35 +580,192 @@ multi cbor-diagnostic(Blob:D $cbor) is export {
 }
 
 # Convert a CBOR-encoded value to human diagnostic form, starting at $pos
-multi cbor-diagnostic(Blob:D $cbor, Int:D $pos is rw) is export {
+multi cbor-diagnostic(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is export {
     my $initial-byte = $cbor.read-uint8($pos++);
     my $major-type   = $initial-byte +& CBOR_MajorType_Mask;
-    my $val          = $initial-byte +& CBOR_Argument_Mask;
+    my $argument     = $initial-byte +& CBOR_Argument_Mask;
+
+    my &read-uint = {
+        if $argument < CBOR_1Byte {
+            $argument
+        }
+        elsif $argument == CBOR_1Byte {
+            $cbor.read-uint8($pos++)
+        }
+        elsif $argument == CBOR_2Byte {
+            my $v = $cbor.read-uint16($pos, BigEndian);
+            $pos += 2;
+            $v
+        }
+        elsif $argument == CBOR_4Byte {
+            my $v = $cbor.read-uint32($pos, BigEndian);
+            $pos += 4;
+            $v
+        }
+        elsif $argument == CBOR_8Byte {
+            my $v = $cbor.read-uint64($pos, BigEndian);
+            $pos += 8;
+            $v
+        }
+        elsif $argument == CBOR_Indefinite_Break {
+            Whatever
+        }
+        else {
+            fail "argument($argument)"
+        }
+    }
 
     given $major-type {
         when CBOR_UInt {
-            ...
+            ~read-uint
         }
         when CBOR_NInt {
-            ...
+            ~(+^read-uint)
         }
         when CBOR_BStr {
-            ...
+            my $bytes = read-uint;
+
+            # Indefinite length
+            if $bytes === Whatever {
+                # Peek and see if there are any chunks
+                if $cbor.read-uint8($pos) == CBOR_SVal +| CBOR_Indefinite_Break {
+                    "''_"
+                }
+                else {
+                    my @chunks;
+                    until (my $chunk := cbor-diagnostic($cbor, $pos, :breakable))
+                          =:= Break {
+                        @chunks.push($chunk);
+                    }
+                    '(_ ' ~ @chunks.join(', ') ~ ')';
+                }
+            }
+            # Definite length
+            elsif $bytes > CBOR_Max_UInt_63Bit {
+                "'Unreasonably long byte string, length $bytes'"
+            }
+            else {
+                my $buf = $cbor.subbuf($pos, $bytes);
+                if $buf.bytes == $bytes {
+                    $pos += $bytes;
+                    "h'" ~ $buf.list.map(*.base(16)) ~ "'"
+                }
+                else {
+                    "'Byte string too short, {$buf.bytes} < $bytes bytes'"
+                }
+            }
         }
         when CBOR_TStr {
-            ...
+            my $bytes = read-uint;
+
+            # Indefinite length
+            if $bytes === Whatever {
+                # Peek and see if there are any chunks
+                if $cbor.read-uint8($pos) == CBOR_SVal +| CBOR_Indefinite_Break {
+                    '""_'
+                }
+                else {
+                    my @chunks;
+                    until (my $chunk := cbor-diagnostic($cbor, $pos, :breakable))
+                          =:= Break {
+                        @chunks.push($chunk);
+                    }
+                    '(_ ' ~ @chunks.join(', ') ~ ')';
+                }
+            }
+            # Definite length
+            elsif $bytes > CBOR_Max_UInt_63Bit {
+                "\"Unreasonably long text string, length $bytes\""
+            }
+            else {
+                my $utf8 = $cbor.subbuf($pos, $bytes);
+                if $utf8.bytes == $bytes {
+                    $pos += $bytes;
+                    # XXXX: JSON escaping?
+                    '"' ~ $utf8.decode ~ '"'
+                }
+                else {
+                    "\"Text string too short, {$utf8.bytes} < $bytes bytes\""
+                }
+            }
         }
         when CBOR_Array {
-            ...
+            # Indefinite length
+            $argument == CBOR_Indefinite_Break
+            ?? do {
+                my @array;
+                until (my $item := cbor-diagnostic($cbor, $pos, :breakable)) =:= Break {
+                    @array.push($item);
+                }
+                '[_ ' ~ @array.join(', ') ~ ']'
+            }
+            !! '[' ~ (^read-uint).map({ cbor-diagnostic($cbor, $pos) }).join(', ') ~ ']'
         }
         when CBOR_Map {
-            ...
+            my @pairs;
+            # Indefinite length
+            if $argument == CBOR_Indefinite_Break {
+                loop {
+                    my $k := cbor-diagnostic($cbor, $pos, :breakable);
+                    last if $k =:= Break;
+                    @pairs.push($k => cbor-diagnostic($cbor, $pos));
+                }
+                '{_ ' ~ @pairs.fmt('%s: %s', ', ') ~ '}'
+            }
+            # Definite length
+            else {
+                for ^(read-uint) {
+                    my $k = cbor-diagnostic($cbor, $pos);
+                    my $v = cbor-diagnostic($cbor, $pos);
+                    @pairs.push($k => $v);
+                }
+                '{' ~ @pairs.fmt('%s: %s', ', ') ~ '}'
+            }
         }
         when CBOR_Tag {
-            ...
+            read-uint() ~ '(' ~ cbor-diagnostic($cbor, $pos) ~ ')'
         }
         when CBOR_SVal {
-            ...
+            my constant %svals = 20 => 'false', 21 => 'true',
+                                 22 => 'null',  23 => 'undefined';
+            sub JS-Num($v) {
+                $v.isNaN   ??  'NaN'      !!
+                $v ==  Inf ??  'Infinity' !!
+                $v == -Inf ?? '-Infinity' !! ~$v
+            }
+
+            if $argument < CBOR_False {
+                "simple($argument)"
+            }
+            elsif $argument <= CBOR_Undef {
+                %svals{$argument}
+            }
+            elsif $argument == CBOR_1Byte {
+                my $sval = $cbor.read-uint8($pos++);
+                "simple($sval)"
+            }
+            elsif $argument == CBOR_2Byte {
+                my $v = num-from-bin16($cbor.read-uint16($pos, BigEndian));
+                $pos += 2;
+                JS-Num($v) ~ '_1'
+            }
+            elsif $argument == CBOR_4Byte {
+                my $v = $cbor.read-num32($pos, BigEndian);
+                $pos += 4;
+                JS-Num($v) ~ '_2'
+            }
+            elsif $argument == CBOR_8Byte {
+                my $v = $cbor.read-num64($pos, BigEndian);
+                $pos += 8;
+                JS-Num($v) ~ '_3'
+            }
+            elsif $breakable && $argument == CBOR_Indefinite_Break {
+                Break
+            }
+            else {
+                "simple($argument)"
+            }
+
         }
     }
 }
