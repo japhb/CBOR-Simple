@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 89;
+plan 90;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -169,6 +169,9 @@ matches Rat.new(   -18446744073709551614, 18446744073709551615),
 matches FatRat.new(-18446744073709551615, 18446744073709551616),
         'd81e823bfffffffffffffffec249010000000000000000';
 
+
+# Tag 55799: Self-describing CBOR
+decodes-to 100, 'd9d9f71864';
 
 # XXXX: Other known tags
 

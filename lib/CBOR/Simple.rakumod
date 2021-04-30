@@ -53,6 +53,7 @@ enum CBORTagNumber (
     CBOR_Tag_Decimal_Fraction => 4,
     CBOR_Tag_Bigfloat         => 5,
     CBOR_Tag_Rational         => 30,
+    CBOR_Tag_Self_Described   => 55799,
 );
 
 
@@ -82,9 +83,12 @@ my $utf8-encoder = Encoding::Registry.find("utf8").encoder;
 constant RFC8949_Map_Key_Sort = False;
 
 
-# Encode an arbitrary value to CBOR
-multi cbor-encode(Mu $value) is export {
-    cbor-encode($value, my $pos = 0)
+# Encode an arbitrary value to CBOR, possibly with leading self-describing tag 55799
+multi cbor-encode(Mu $value, :$cbor-self-tag) is export {
+    my $pos;
+    $cbor-self-tag
+    ?? cbor-encode($value, $pos = 3, buf8.new(0xd9, 0xd9, 0xf7))
+    !! cbor-encode($value, $pos = 0)
 }
 
 # Encode an arbitrary value to CBOR, specifying a buffer position to begin writing
@@ -514,12 +518,15 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                                                !! FatRat.new($man, $de)
                 }
             }
-
+            # Self-tagged CBOR, just unwrap the decoded tag content
+            elsif $tag-number == CBOR_Tag_Self_Described {
+                decode
+            }
             # XXXX: skipped tags 16..18, 21..29
             # XXXX: Handle more special tags
 
             else {
-                Tagged.new(:$tag-number, :value(cbor-decode($cbor, $pos)))
+                Tagged.new(:$tag-number, :value(decode))
             }
         }
         else { # $major-type == CBOR_SVal
