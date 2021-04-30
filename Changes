@@ -1,6 +1,6 @@
 Revision history for CBOR-Simple
 
-0.0.6  *WIP*
+0.0.6  2021-04-29
   [Diagnostics]
   - Add cbor-diagnostic($cbor) routine to decode into text diagnostics
   - Add RFC 8949 Appendix A diagnostic tests
