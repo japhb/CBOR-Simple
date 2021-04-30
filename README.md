@@ -10,17 +10,22 @@ SYNOPSIS
 
 ```raku
 use CBOR::Simple;
+
+# Encode a Raku value to CBOR, or vice-versa
 my $cbor = cbor-encode($value);
 my $val1 = cbor-decode($cbor);               # Fails if more data past first decoded value
 my $val2 = cbor-decode($cbor, my $pos = 0);  # Updates $pos after decoding first value
 
 # By default, cbor-decode() marks partially corrupt parsed structures with
 # Failure nodes at the point of corruption
-my $bad = cbor-decode(buf8.new(0x81 xx 3));  # [[[Failure]]]
+my $bad  = cbor-decode(buf8.new(0x81 xx 3));  # [[[Failure]]]
 
 # Callers can instead force throwing exceptions on any error
 my $*CBOR_SIMPLE_FATAL_ERRORS = True;
-my $bad = cbor-decode(buf8.new(0x81 xx 3));  # BOOM!
+my $bad  = cbor-decode(buf8.new(0x81 xx 3));  # BOOM!
+
+# Decode CBOR into diagnostic text, used for checking encodings and complex structures
+my $diag = cbor-diagnostic($cbor);
 ```
 
 DESCRIPTION
@@ -58,6 +63,8 @@ OTHER SPECIAL CASES
   * CBOR's `undefined` is translated as `Mu` in Raku
 
   * CBOR strings claiming to be longer than `2⁶‭³‭-1` are treated as malformed
+
+  * `cbor-diagnostic()` always adds encoding indicators for float values
 
 AUTHOR
 ======
