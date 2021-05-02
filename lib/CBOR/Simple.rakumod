@@ -313,7 +313,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         default { .rethrow }
     }
 
-    my $argument;
+    my int $argument;
 
     my &read-uint = -> $allow-indefinite = False {
         if $argument < CBOR_1Byte {
@@ -347,8 +347,8 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
     }
 
     my &decode = {
-        my $initial-byte = $cbor.read-uint8($pos++);
-        my $major-type   = $initial-byte +& CBOR_MajorType_Mask;
+        my int $initial-byte = $cbor.read-uint8($pos++);
+        my int $major-type   = $initial-byte +& CBOR_MajorType_Mask;
         $argument = $initial-byte +& CBOR_Argument_Mask;
 
         $major-type == CBOR_UInt ??   read-uint() !!
