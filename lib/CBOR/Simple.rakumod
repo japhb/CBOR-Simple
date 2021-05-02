@@ -313,6 +313,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         default { .rethrow }
     }
 
+    my int $cbor-length = $cbor.bytes;
     my int $argument;
 
     my &read-uint = -> $allow-indefinite = False {
@@ -391,15 +392,21 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 @chunks.join
             }
             # Definite length
-            else {
+            elsif $bytes {
                 fail-malformed "Unreasonably long text string"
                     if $bytes > CBOR_Max_UInt_63Bit;
 
-                my $utf8 = $cbor.subbuf($pos, $bytes);
-                fail-malformed "Text string too short" unless $utf8.bytes == $bytes;
+                my int $p = $pos;
+                my int $b = $bytes;
+                my int $a = nqp::add_i($p, $b);
+
+                fail-malformed "Text string too short"
+                    unless $cbor-length >= $a;
+
                 $pos += $bytes;
-                $utf8.decode
+                nqp::p6box_s(nqp::decode(nqp::slice($cbor, $p, $a - 1), 'utf8'))
             }
+            else { '' }
         }
         elsif $major-type == CBOR_Array {
             # Indefinite length
