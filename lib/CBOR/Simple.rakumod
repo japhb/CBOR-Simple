@@ -216,11 +216,10 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             }
             elsif nqp::istype($_, Stringy) {
                 if nqp::istype($_, Str) {
-                    my $utf8  = $utf8-encoder.encode-chars($_);
-                    my $bytes = $utf8.bytes;
-
+                    my $utf8 := $utf8-encoder.encode-chars($_);
+                    my $bytes = nqp::elems($utf8);
                     write-uint(CBOR_TStr, $bytes);
-                    $buf.splice($pos, $bytes, $utf8);
+                    nqp::splice($buf, $utf8, $pos, $bytes);
                     $pos += $bytes;
                 }
                 elsif nqp::istype($_, Blob) {
