@@ -396,15 +396,12 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 fail-malformed "Unreasonably long text string"
                     if $bytes > CBOR_Max_UInt_63Bit;
 
-                my int $p = $pos;
-                my int $b = $bytes;
-                my int $a = nqp::add_i($p, $b);
-
                 fail-malformed "Text string too short"
-                    unless $cbor-length >= $a;
+                    unless $cbor-length >= (my $a = $pos + $bytes);
 
-                $pos += $bytes;
-                nqp::p6box_s(nqp::decode(nqp::slice($cbor, $p, $a - 1), 'utf8'))
+                my $str := nqp::p6box_s(nqp::decode(nqp::slice($cbor, $pos, $a - 1), 'utf8'));
+                $pos = $a;
+                $str
             }
             else { '' }
         }
