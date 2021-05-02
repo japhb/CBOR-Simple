@@ -460,19 +460,19 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                                            !! FatRat.new($nu, $de)
             }
             elsif $tag-number == CBOR_Tag_DateTime_Number {
-                my $seconds := cbor-decode($cbor, $pos);
+                my $seconds := decode;
                 fail-malformed "Epoch DateTime tag(1) does not contain a real number"
                     unless nqp::istype($seconds, Real);
                 Instant.from-posix($seconds) // fail-malformed "Epoch DateTime could not be decoded"
             }
             elsif $tag-number == CBOR_Tag_DateTime_String {
-                my $dt := cbor-decode($cbor, $pos);
+                my $dt := decode;
                 fail-malformed "DateTime tag (0) does not contain a string"
                     unless nqp::istype($dt, Str);
                 DateTime.new($dt) // fail-malformed "DateTime string could not be parsed"
             }
             elsif $tag-number == CBOR_Tag_Unsigned_BigInt {
-                my $bytes := cbor-decode($cbor, $pos);
+                my $bytes := decode;
                 fail-malformed "Unsigned BigInt does not contain a byte string"
                     unless nqp::istype($bytes, Buf);
                 my $value = 0;
@@ -480,7 +480,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 $value
             }
             elsif $tag-number == CBOR_Tag_Negative_BigInt {
-                my $bytes := cbor-decode($cbor, $pos);
+                my $bytes := decode;
                 fail-malformed "Negative BigInt does not contain a byte string"
                     unless nqp::istype($bytes, Buf);
                 my $value = 0;
