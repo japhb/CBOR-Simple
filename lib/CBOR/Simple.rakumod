@@ -387,10 +387,8 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         $major-type == CBOR_UInt ??   read-uint() !!
         $major-type == CBOR_NInt ?? +^read-uint() !!
         do if $major-type == CBOR_BStr {
-            my $bytes = read-uint(!$breakable);
-
             # Indefinite length
-            if $bytes === Whatever {
+            if $argument == CBOR_Indefinite_Break && !$breakable {
                 my buf8 $joined .= new;
                 until (my $chunk := cbor-decode($cbor, $pos, :breakable)) =:= Break {
                     fail-malformed "Byte string chunk has wrong type"
@@ -400,7 +398,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 $joined
             }
             # Definite length
-            elsif $bytes {
+            elsif (my $bytes = read-uint) {
                 fail-malformed "Unreasonably long byte string"
                     if $bytes > CBOR_Max_UInt_63Bit;
 
@@ -414,10 +412,8 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             else { buf8.new }
         }
         elsif $major-type == CBOR_TStr {
-            my $bytes = read-uint(!$breakable);
-
             # Indefinite length
-            if $bytes === Whatever {
+            if $argument == CBOR_Indefinite_Break && !$breakable {
                 my @chunks;
                 until (my $chunk := cbor-decode($cbor, $pos, :breakable)) =:= Break {
                     fail-malformed "Text string chunk has wrong type"
@@ -427,7 +423,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 @chunks.join
             }
             # Definite length
-            elsif $bytes {
+            elsif (my $bytes = read-uint) {
                 fail-malformed "Unreasonably long text string"
                     if $bytes > CBOR_Max_UInt_63Bit;
 
