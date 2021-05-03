@@ -352,31 +352,42 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
     my int $cbor-length = $cbor.bytes;
     my int $argument;
 
-    my &read-uint = -> $allow-indefinite = False {
-        $argument <  CBOR_1Byte ?? $argument !!
-        $argument == CBOR_1Byte ?? nqp::readuint($cbor, $pos++, $ne8) !! do
-        if $argument == CBOR_2Byte {
-            my int $v = nqp::readuint($cbor, $pos, $be16);
-            $pos += 2;
-            $v
-        }
-        elsif $argument == CBOR_4Byte {
-            my int $v = nqp::readuint($cbor, $pos, $be32);
-            $pos += 4;
-            $v
-        }
-        elsif $argument == CBOR_8Byte {
-            my $v = nqp::readuint($cbor, $pos, $be64);
-            $pos += 8;
-            $v
-        }
-        elsif $argument == CBOR_Indefinite_Break {
-            $allow-indefinite ?? Whatever
-                              !! fail-malformed "Unexpected indefinite argument";
-        }
-        else {
-            fail-malformed "Invalid argument $argument";
-        }
+    # This gets called by almost all definite value decoders, so go for speed
+    my &read-uint = {
+        my int $v;
+        nqp::if(
+            nqp::islt_i($argument, CBOR_1Byte),
+            $argument,
+            nqp::if(
+                nqp::iseq_i($argument, CBOR_1Byte),
+                nqp::readuint($cbor, $pos++, $ne8),
+                nqp::if(
+                    nqp::iseq_i($argument, CBOR_2Byte),
+                    nqp::stmts(
+                        ($v = nqp::readuint($cbor, $pos, $be16)),
+                        ($pos += 2),
+                        $v
+                    ),
+                    nqp::if(
+                        nqp::iseq_i($argument, CBOR_4Byte),
+                        nqp::stmts(
+                            ($v = nqp::readuint($cbor, $pos, $be32)),
+                            ($pos += 4),
+                            $v
+                        ),
+                        nqp::if(
+                            nqp::iseq_i($argument, CBOR_8Byte),
+                            nqp::stmts(
+                                (my $v64 = nqp::readuint($cbor, $pos, $be64)),
+                                ($pos += 8),
+                                $v64
+                            ),
+                            fail-malformed("Invalid argument $argument")
+                        )
+                    )
+                )
+            )
+        )
     }
 
     my &decode = {
