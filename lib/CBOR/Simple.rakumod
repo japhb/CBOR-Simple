@@ -75,6 +75,13 @@ class X::Malformed is X::AdHoc {}
 PROCESS::<$CBOR_SIMPLE_FATAL_ERRORS> = False;
 
 
+# Buffer read/write constants
+my int $ne8  = nqp::bitor_i(nqp::const::BINARY_SIZE_8_BIT, NativeEndian);
+my int $be16 = nqp::bitor_i(nqp::const::BINARY_SIZE_16_BIT, BigEndian);
+my int $be32 = nqp::bitor_i(nqp::const::BINARY_SIZE_32_BIT, BigEndian);
+my int $be64 = nqp::bitor_i(nqp::const::BINARY_SIZE_64_BIT, BigEndian);
+
+
 # Precache a utf8 encoder, since we'll be doing it a LOT
 my $utf8-encoder = Encoding::Registry.find("utf8").encoder;
 
@@ -95,24 +102,24 @@ multi cbor-encode(Mu $value, :$cbor-self-tag) is export {
 multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export {
     my sub write-uint($major-type, $value) {
         if $value < CBOR_1Byte {
-            $buf.write-uint8($pos++, $major-type + $value);
+            nqp::writeuint($buf, $pos++, $major-type + $value, $ne8);
         }
         elsif $value <= CBOR_Max_UInt_1Byte {
-            $buf.write-uint8($pos++, $major-type + CBOR_1Byte);
-            $buf.write-uint8($pos++, $value);
+            nqp::writeuint($buf, $pos++, $major-type + CBOR_1Byte, $ne8);
+            nqp::writeuint($buf, $pos++, $value, $ne8);
         }
         elsif $value <= CBOR_Max_UInt_2Byte {
-            $buf.write-uint8($pos++, $major-type + CBOR_2Byte);
-            $buf.write-uint16($pos, $value, BigEndian);
+            nqp::writeuint($buf, $pos++, $major-type + CBOR_2Byte, $ne8);
+            nqp::writeuint($buf, $pos, $value, $be16);
             $pos += 2;
         }
         elsif $value <= CBOR_Max_UInt_4Byte {
-            $buf.write-uint8($pos++, $major-type + CBOR_4Byte);
-            $buf.write-uint32($pos, $value, BigEndian);
+            nqp::writeuint($buf, $pos++, $major-type + CBOR_4Byte, $ne8);
+            nqp::writeuint($buf, $pos, $value, $be32);
             $pos += 4;
         }
         elsif $value <= CBOR_Max_UInt_8Byte {
-            $buf.write-uint8($pos++, $major-type + CBOR_8Byte);
+            nqp::writeuint($buf, $pos++, $major-type + CBOR_8Byte, $ne8);
             $buf.write-uint64($pos, $value, BigEndian);
             $pos += 8;
         }
@@ -126,7 +133,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             # Check for Numeric before Stringy so allomorphs prefer Numeric
             if nqp::istype($_, Numeric) {
                 if nqp::istype($_, Bool) {
-                    $buf.write-uint8($pos++, CBOR_SVal + ($_ ?? CBOR_True !! CBOR_False));
+                    nqp::writeuint($buf, $pos++, CBOR_SVal + ($_ ?? CBOR_True !! CBOR_False), $ne8);
                 }
                 elsif nqp::istype($_, Int) {
                     if CBOR_Min_NInt_8Byte <= $_ <= CBOR_Max_UInt_8Byte {
@@ -135,7 +142,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     }
                     # Unsigned BigInt
                     elsif $_ >= 0 {
-                        $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_Unsigned_BigInt);
+                        nqp::writeuint($buf, $pos++, CBOR_Tag + CBOR_Tag_Unsigned_BigInt, $ne8);
                         my @bytes = .polymod(256 xx *).reverse;
                         my $bytes = @bytes.elems;
                         write-uint(CBOR_BStr, $bytes);
@@ -144,7 +151,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     }
                     # Negative BigInt
                     else {
-                        $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_Negative_BigInt);
+                        nqp::writeuint($buf, $pos++, CBOR_Tag + CBOR_Tag_Negative_BigInt, $ne8);
                         my @bytes = (+^$_).polymod(256 xx *).reverse;
                         my $bytes = @bytes.elems;
                         write-uint(CBOR_BStr, $bytes);
@@ -165,26 +172,26 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     # my $bin16 = bin16-from-num($_);
                     # my $num16 = num-from-bin16($bin16);
                     # if $num16 == $_ {  # XXXX: What about NaN?
-                    #     $buf.write-uint8($pos++, CBOR_SVal + CBOR_2Byte);
-                    #     $buf.write-uint16($pos, $bin16, BigEndian);
+                    #     nqp::writeuint($buf, $pos++, CBOR_SVal + CBOR_2Byte, $ne8);
+                    #     nqp::writeuint($buf, $pos, $bin16, $be16);
                     #     $pos += 2;
                     # }
                     if $use32 {
-                        $buf.write-uint8($pos++, CBOR_SVal + CBOR_4Byte);
-                        $buf.write-num32($pos, $num32, BigEndian);
+                        nqp::writeuint($buf, $pos++, CBOR_SVal + CBOR_4Byte, $ne8);
+                        nqp::writenum($buf, $pos, $num32, $be32);
 
                         # Canonify NaN sign bit to 0, even on platforms with -NaN
-                        $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
+                        nqp::writeuint($buf, $pos, nqp::readuint($buf, $pos, $ne8) +& 0x7F, $ne8)
                             if $isnan;
 
                         $pos += 4;
                     }
                     else {
-                        $buf.write-uint8($pos++, CBOR_SVal + CBOR_8Byte);
-                        $buf.write-num64($pos, $_, BigEndian);
+                        nqp::writeuint($buf, $pos++, CBOR_SVal + CBOR_8Byte, $ne8);
+                        nqp::writenum($buf, $pos, $_, $be64);
 
                         # Canonify NaN sign bit to 0, even on platforms with -NaN
-                        $buf.write-uint8($pos, $buf.read-uint8($pos) +& 0x7F)
+                        nqp::writeuint($buf, $pos, nqp::readuint($buf, $pos, $ne8) +& 0x7F, $ne8)
                             if $isnan;
 
                         $pos += 8;
@@ -192,9 +199,9 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 }
                 elsif nqp::istype($_, Rational) {
                     # write-uint(CBOR_Tag, CBOR_Tag_Rational);
-                    $buf.write-uint8($pos++, CBOR_Tag + CBOR_1Byte);
-                    $buf.write-uint8($pos++, CBOR_Tag_Rational);
-                    $buf.write-uint8($pos++, CBOR_Array + 2);
+                    nqp::writeuint($buf, $pos++, CBOR_Tag + CBOR_1Byte, $ne8);
+                    nqp::writeuint($buf, $pos++, CBOR_Tag_Rational, $ne8);
+                    nqp::writeuint($buf, $pos++, CBOR_Array + 2, $ne8);
                     encode(.numerator);
                     encode(.denominator);
                 }
@@ -202,7 +209,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     my $num = .to-posix[0].Num;
                     my $val = $num.Int == $num ?? $num.Int !! $num;
 
-                    $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
+                    nqp::writeuint($buf, $pos++, CBOR_Tag + CBOR_Tag_DateTime_Number, $ne8);
                     encode($val);
                 }
                 elsif nqp::istype($_, Real) {
@@ -264,11 +271,11 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     my $num = .Instant.to-posix[0].Num;
                     my $val = $num.Int == $num ?? $num.Int !! $num;
 
-                    $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_Number);
+                    nqp::writeuint($buf, $pos++, CBOR_Tag + CBOR_Tag_DateTime_Number, $ne8);
                     encode($val);
                 }
                 else {
-                    $buf.write-uint8($pos++, CBOR_Tag + CBOR_Tag_DateTime_String);
+                    nqp::writeuint($buf, $pos++, CBOR_Tag + CBOR_Tag_DateTime_String, $ne8);
                     encode(.yyyy-mm-dd);
                 }
             }
@@ -280,7 +287,8 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
         # Undefined values
         else {
             # Any:U is CBOR null, other Mu:U is CBOR undefined
-            $buf.write-uint8($pos++, CBOR_SVal + (nqp::istype($value, Any) ?? CBOR_Null !! CBOR_Undef));
+            nqp::writeuint($buf, $pos++, CBOR_SVal + (nqp::istype($value, Any)
+                                                      ?? CBOR_Null !! CBOR_Undef), $ne8);
         }
     }
 
@@ -317,24 +325,20 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
     my int $argument;
 
     my &read-uint = -> $allow-indefinite = False {
-        if $argument < CBOR_1Byte {
-            $argument
-        }
-        elsif $argument == CBOR_1Byte {
-            $cbor.read-uint8($pos++)
-        }
-        elsif $argument == CBOR_2Byte {
-            my $v = $cbor.read-uint16($pos, BigEndian);
+        $argument <  CBOR_1Byte ?? $argument !!
+        $argument == CBOR_1Byte ?? nqp::readuint($cbor, $pos++, $ne8) !! do
+        if $argument == CBOR_2Byte {
+            my int $v = nqp::readuint($cbor, $pos, $be16);
             $pos += 2;
             $v
         }
         elsif $argument == CBOR_4Byte {
-            my $v = $cbor.read-uint32($pos, BigEndian);
+            my int $v = nqp::readuint($cbor, $pos, $be32);
             $pos += 4;
             $v
         }
         elsif $argument == CBOR_8Byte {
-            my $v = $cbor.read-uint64($pos, BigEndian);
+            my $v = nqp::readuint($cbor, $pos, $be64);
             $pos += 8;
             $v
         }
@@ -348,7 +352,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
     }
 
     my &decode = {
-        my int $initial-byte = $cbor.read-uint8($pos++);
+        my int $initial-byte = nqp::readuint($cbor, $pos++, $ne8);
         my int $major-type   = $initial-byte +& CBOR_MajorType_Mask;
         $argument = $initial-byte +& CBOR_Argument_Mask;
 
@@ -447,7 +451,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             my $tag-number = read-uint;
             if $tag-number == CBOR_Tag_Rational {
                 fail-malformed "Rational tag (30) does not contain an array with exactly two elements"
-                    unless $cbor.read-uint8($pos++) == CBOR_Array + 2;
+                    unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_Array + 2;
 
                 my $nu = decode;
                 my $de = decode;
@@ -489,7 +493,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             }
             elsif $tag-number == CBOR_Tag_Decimal_Fraction {
                 fail-malformed "Decimal Fraction tag (4) does not contain an array with exactly two elements"
-                    unless $cbor.read-uint8($pos++) == CBOR_Array + 2;
+                    unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_Array + 2;
 
                 my $exp = decode;
                 my $man = decode;
@@ -506,7 +510,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             }
             elsif $tag-number == CBOR_Tag_Bigfloat {
                 fail-malformed "Bigfloat tag (5) does not contain an array with exactly two elements"
-                    unless $cbor.read-uint8($pos++) == CBOR_Array + 2;
+                    unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_Array + 2;
 
                 my $exp = decode;
                 my $man = decode;
@@ -542,7 +546,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 %svals{$argument}
             }
             elsif $argument == CBOR_1Byte {
-                my $val  = $cbor.read-uint8($pos++);
+                my $val  = nqp::readuint($cbor, $pos++, $ne8);
                 my $fail = $val < 24 ?? "Badly formed" !!
                            $val < 32 ?? "Reserved"     !!
                                         "Unassigned"   ;
