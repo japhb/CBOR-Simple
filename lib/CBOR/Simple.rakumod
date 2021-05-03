@@ -42,6 +42,7 @@ enum CBORMagicNumber (
     CBOR_Min_NInt_2Byte => -65536,
     CBOR_Min_NInt_4Byte => -4294967296,
     CBOR_Min_NInt_8Byte => -18446744073709551616,
+    CBOR_Max_NInt_63Bit => -9223372036854775808,
 );
 
 
@@ -202,8 +203,21 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     nqp::writeuint($buf, $pos++, CBOR_Tag + CBOR_1Byte, $ne8);
                     nqp::writeuint($buf, $pos++, CBOR_Tag_Rational, $ne8);
                     nqp::writeuint($buf, $pos++, CBOR_Array + 2, $ne8);
-                    encode(.numerator);
-                    encode(.denominator);
+
+                    my $nu := .numerator;
+                    # Slow path for FatRats and "big" Rats
+                    if nqp::istype($_, FatRat)
+                    || $nu > CBOR_Max_UInt_63Bit
+                    || $nu < CBOR_Max_NInt_63Bit {
+                        encode(.numerator);
+                        encode(.denominator);
+                    }
+                    # Fast path for "small" Rats
+                    else {
+                        $nu >= 0 ?? write-uint(CBOR_UInt,   $nu)
+                                 !! write-uint(CBOR_NInt, +^$nu);
+                        write-uint(CBOR_UInt, .denominator);
+                    }
                 }
                 elsif nqp::istype($_, Instant) {
                     my $num = .to-posix[0].Num;
