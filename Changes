@@ -1,5 +1,10 @@
 Revision history for CBOR-Simple
 
+0.0.7  2021-05-02
+  - Improve performance in many small (a few %) to medium (2x) ways,
+    both for encoding and decoding
+
+
 0.0.6  2021-04-29
   [Diagnostics]
   - Add cbor-diagnostic($cbor) routine to decode into text diagnostics
