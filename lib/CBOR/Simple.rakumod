@@ -42,7 +42,7 @@ enum CBORMagicNumber (
     CBOR_Min_NInt_2Byte => -65536,
     CBOR_Min_NInt_4Byte => -4294967296,
     CBOR_Min_NInt_8Byte => -18446744073709551616,
-    CBOR_Max_NInt_63Bit => -9223372036854775808,
+    CBOR_Min_NInt_63Bit => -9223372036854775808,
 );
 
 
@@ -101,7 +101,7 @@ multi cbor-encode(Mu $value, :$cbor-self-tag) is export {
 
 # Encode an arbitrary value to CBOR, specifying a buffer position to begin writing
 multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export {
-    my sub write-uint($major-type, $value) {
+    my sub write-uint(int $major-type, int $value) {
         if $value < CBOR_1Byte {
             nqp::writeuint($buf, $pos++, $major-type + $value, $ne8);
         }
@@ -119,11 +119,17 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             nqp::writeuint($buf, $pos, $value, $be32);
             $pos += 4;
         }
-        elsif $value <= CBOR_Max_UInt_8Byte {
+        else {
             nqp::writeuint($buf, $pos++, $major-type + CBOR_8Byte, $ne8);
-            $buf.write-uint64($pos, $value, BigEndian);
+            nqp::writeuint($buf, $pos, $value, $be64);
             $pos += 8;
         }
+    }
+
+    my sub write-medium-uint(int $major-type, $value) {
+        nqp::writeuint($buf, $pos++, $major-type + CBOR_8Byte, $ne8);
+        $buf.write-uint64($pos, $value, BigEndian);
+        $pos += 8;
     }
 
     my &encode = -> $value {
@@ -137,9 +143,15 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     nqp::writeuint($buf, $pos++, CBOR_SVal + ($_ ?? CBOR_True !! CBOR_False), $ne8);
                 }
                 elsif nqp::istype($_, Int) {
-                    if CBOR_Min_NInt_8Byte <= $_ <= CBOR_Max_UInt_8Byte {
+                    # Small int
+                    if CBOR_Min_NInt_63Bit <= $_ <= CBOR_Max_UInt_63Bit {
                         $_ >= 0 ?? write-uint(CBOR_UInt,   $_)
                                 !! write-uint(CBOR_NInt, +^$_);
+                    }
+                    # Medium int
+                    elsif CBOR_Min_NInt_8Byte <= $_ <= CBOR_Max_UInt_8Byte {
+                        $_ >= 0 ?? write-medium-uint(CBOR_UInt,   $_)
+                                !! write-medium-uint(CBOR_NInt, +^$_);
                     }
                     # Unsigned BigInt
                     elsif $_ >= 0 {
@@ -208,8 +220,8 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     # Slow path for FatRats and "big" Rats
                     if nqp::istype($_, FatRat)
                     || $nu > CBOR_Max_UInt_63Bit
-                    || $nu < CBOR_Max_NInt_63Bit {
-                        encode(.numerator);
+                    || $nu < CBOR_Min_NInt_63Bit {
+                        encode($nu);
                         encode(.denominator);
                     }
                     # Fast path for "small" Rats
