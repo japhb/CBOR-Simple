@@ -271,8 +271,82 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             }
             # XXXX: Seq/Iterator?
             elsif nqp::istype($_, Positional) {
-                write-uint(CBOR_Array, .elems);
-                encode($_) for @$_;
+                constant $endian   = Kernel.endian == LittleEndian ?? 4 !! 0;
+                constant %type-tag =
+                    byte   => 0x40,
+                    uint8  => 0x40,
+                    uint16 => 0x41 + $endian,
+                    uint32 => 0x42 + $endian,
+                    uint64 => 0x43 + $endian,
+                    uint   => 0x43 + $endian,
+
+                    int8   => 0x48,
+                    int16  => 0x49 + $endian,
+                    int32  => 0x4A + $endian,
+                    int64  => 0x4B + $endian,
+                    int    => 0x4B + $endian,
+
+                    num32  => 0x51 + $endian,
+                    num64  => 0x52 + $endian,
+                    num    => 0x52 + $endian;
+
+                # Pack native arrays using RFC 8746 Typed Arrays tag
+                if nqp::istype($_, array) {
+                    my $array     := $_<>;
+                    my $type       = $array.of;
+                    my int $elems  = $array.elems;
+                    # write-uint(CBOR_Tag, %type-tag{$type.^name});
+
+                    if $type === num32 {
+                        write-uint(CBOR_Tag, %type-tag{$type.^name});
+                        write-uint(CBOR_BStr, $elems * 4);
+
+                        my int $p = $pos;
+                        my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_32_BIT,
+                                                 NativeEndian);
+                        my int $i = -1;
+                        nqp::while(
+                            nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                            nqp::writenum($buf,
+                                          nqp::add_i($p, nqp::bitshiftl_i($i, 2)),
+                                          nqp::atpos_n($array, $i),
+                                          $t)
+
+                        );
+
+                        $pos += $elems * 4;
+                    }
+                    elsif $type === num64 || $type === num  {
+                        write-uint(CBOR_Tag, %type-tag{$type.^name});
+                        write-uint(CBOR_BStr, $elems * 8);
+
+                        my int $p = $pos;
+                        my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_64_BIT,
+                                                 NativeEndian);
+                        my int $i = -1;
+                        nqp::while(
+                            nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                            nqp::writenum($buf,
+                                          nqp::add_i($p, nqp::bitshiftl_i($i, 3)),
+                                          nqp::atpos_n($array, $i),
+                                          $t)
+
+                        );
+
+                        $pos += $elems * 8;
+                    }
+                    else {
+                        # XXXX: Fake other packed array types by writing them
+                        #       as standard Arrays instead
+                        write-uint(CBOR_Array, .elems);
+                        encode($_) for @$_;
+                    }
+                }
+                # Treat all other Positional types as standard Arrays
+                else {
+                    write-uint(CBOR_Array, .elems);
+                    encode($_) for @$_;
+                }
             }
             elsif nqp::istype($_, Associative) {
                 write-uint(CBOR_Map, .elems);
@@ -487,7 +561,110 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         }
         elsif $major-type == CBOR_Tag {
             my $tag-number = read-uint;
-            if $tag-number == CBOR_Tag_Rational {
+            if 64 <= $tag-number <= 87 {  # RFC 8746 Typed Arrays; details bit-coded in tag
+                # Decode tag
+                my $is-float         = $tag-number +& 24 == 16;
+                my $is-signed        = $tag-number +& 8;
+                my $is-little-endian = $tag-number +& 4;
+                my $size             = 1 +< ($tag-number +& 3 + $is-float);
+
+                # Determine Endian type to read with
+                my $on-little-endian = Kernel.endian == LittleEndian;
+                my $is-same-endian   = !($is-little-endian ?^ $on-little-endian);
+                my $endian           = $is-same-endian   ?? NativeEndian !!
+                                       $on-little-endian ?? BigEndian    !!
+                                                            LittleEndian;
+
+                # Look at tagged content
+                my int $initial-byte = nqp::readuint($cbor, $pos++, $ne8);
+                my int $major-type   = $initial-byte +& CBOR_MajorType_Mask;
+                $argument            = $initial-byte +& CBOR_Argument_Mask;
+                my $bytes            = read-uint;
+                my int $elems        = $bytes div $size;
+
+                # Check that it is a byte string, with an even number of elements
+                fail-malformed "Typed Array tag ($tag-number) does not contain a byte string"
+                    unless $major-type == CBOR_BStr;
+                fail-malformed "Typed Array with element size $size does not evenly divide byte length $bytes"
+                    if $bytes % $size;
+
+                # Parse out the actual array
+                if $is-float {
+                    if $size == 2 {
+                        my $array := array[num32].new;
+
+                        # Presize array to reduce copying
+                        nqp::setelems($array, $elems);
+
+                        # We can't just memcopy, so apply NQP afterburners instead
+                        my int $p = $pos;
+                        my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_16_BIT, $endian);
+                        my int $i = -1;
+                        nqp::while(
+                            nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                            nqp::bindpos_n($array, $i,
+                                           num-from-bin16(
+                                               nqp::readuint($cbor,
+                                                             nqp::add_i($p, nqp::bitshiftl_i($i,1)),
+                                                             $t)))
+                        );
+
+                        $pos += $bytes;
+                        $array
+                    }
+                    elsif $size == 4 {
+                        my $array := array[num32].new;
+
+                        # Presize array to reduce copying
+                        nqp::setelems($array, $elems);
+
+                        # We can't just memcopy, so apply NQP afterburners instead
+                        my int $p = $pos;
+                        my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_32_BIT, $endian);
+                        my int $i = -1;
+                        nqp::while(
+                            nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                            nqp::bindpos_n($array, $i,
+                                           nqp::readnum($cbor,
+                                                        nqp::add_i($p,
+                                                                   nqp::bitshiftl_i($i, 2)),
+                                                        $t))
+                        );
+
+                        $pos += $bytes;
+                        $array
+                    }
+                    elsif $size == 8 {
+                        my $array := array[num64].new;
+
+                        # Presize array to reduce copying
+                        nqp::setelems($array, $elems);
+
+                        # We can't just memcopy, so apply NQP afterburners instead
+                        my int $p = $pos;
+                        my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_64_BIT, $endian);
+                        my int $i = -1;
+                        nqp::while(
+                            nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                            nqp::bindpos_n($array, $i,
+                                           nqp::readnum($cbor,
+                                                        nqp::add_i($p,
+                                                                   nqp::bitshiftl_i($i, 3)),
+                                                        $t))
+                        );
+
+                        $pos += $bytes;
+                        $array
+                    }
+                    else {
+                        die "Unable to parse native float array with element size $size";
+                    }
+                }
+                else {
+                    ... "Support decoding intarray";
+                }
+            }
+            elsif $tag-number == CBOR_Tag_Rational {
                 fail-malformed "Rational tag (30) does not contain an array with exactly two elements"
                     unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_Array + 2;
 

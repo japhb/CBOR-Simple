@@ -66,4 +66,10 @@ multi MAIN(UInt:D $count = 100, IO() $source = 'fez-test.json') {
 
     my $buf8 = buf8.new((^256).roll(100_000));
     time-codecs('100_000 byte buf8', $count, $buf8);
+
+    my $na32 = array[num32].new(rand xx 10_000);
+    time-codecs('10_000 entry array[num32]', $count, $na32);
+
+    my $na64 = array[num64].new(rand xx 10_000);
+    time-codecs('10_000 entry array[num64]', $count, $na64);
 }

@@ -1,5 +1,13 @@
 Revision history for CBOR-Simple
 
+0.0.8  *WIP*
+  - Partial support for RFC 8746 Typed Arrays tag
+    * Common code and constants
+    * Packed num arrays, both encode and decode
+      (2+ orders of magnitude faster than unpacked Num arrays)
+    * Fallback support for encoding intarrays that encodes as standard Arrays
+
+
 0.0.7  2021-05-02
   - Improve performance in many small (a few %) to medium (2x) ways,
     both for encoding and decoding
