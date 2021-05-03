@@ -372,15 +372,18 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 $joined
             }
             # Definite length
-            else {
+            elsif $bytes {
                 fail-malformed "Unreasonably long byte string"
                     if $bytes > CBOR_Max_UInt_63Bit;
 
-                my $buf = $cbor.subbuf($pos, $bytes);
-                fail-malformed "Byte string too short" unless $buf.bytes == $bytes;
-                $pos += $bytes;
+                fail-malformed "Byte string too short"
+                    unless $cbor-length >= (my $a = $pos + $bytes);
+
+                my $buf := nqp::slice($cbor, $pos, $a - 1);
+                $pos = $a;
                 $buf
             }
+            else { buf8.new }
         }
         elsif $major-type == CBOR_TStr {
             my $bytes = read-uint(!$breakable);
