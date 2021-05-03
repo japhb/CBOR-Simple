@@ -31,7 +31,9 @@ enum CBORMagicNumber (
     CBOR_8Byte => 27,
 
     CBOR_Indefinite_Break => 31,
+);
 
+enum CBORMinMax (
     CBOR_Max_UInt_1Byte => 255,
     CBOR_Max_UInt_2Byte => 65535,
     CBOR_Max_UInt_4Byte => 4294967295,
