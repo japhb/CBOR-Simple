@@ -175,40 +175,59 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     }
                 }
                 elsif nqp::istype($_, Num) {
-                    my $isnan = .isNaN;
-                    my num32 $num32 = $_;
-
-                    my $use32 = $num32 == $_ || $isnan && do {
+                    # Slow path NaNs (which are != themselves), otherwise fast path
+                    if nqp::isne_n($_, $_) {
                         my buf8 $nan .= new;
                         $nan.write-num64(0, $_, BigEndian);
-                        $nan[4] == $nan[5] == $nan[6] == $nan[7] == 0
-                    };
+                        if $nan[4] == $nan[5] == $nan[6] == $nan[7] == 0 {
+                            my num32 $nan32 = $_;
+                            nqp::writeuint($buf, $pos++, CBOR_SVal + CBOR_4Byte, $ne8);
+                            nqp::writenum($buf, $pos, $nan32, $be32);
 
-                    # my $bin16 = bin16-from-num($_);
-                    # my $num16 = num-from-bin16($bin16);
-                    # if $num16 == $_ {  # XXXX: What about NaN?
-                    #     nqp::writeuint($buf, $pos++, CBOR_SVal + CBOR_2Byte, $ne8);
-                    #     nqp::writeuint($buf, $pos, $bin16, $be16);
-                    #     $pos += 2;
-                    # }
-                    if $use32 {
+                            # Canonify NaN sign bit to 0, even on platforms with -NaN
+                            nqp::writeuint($buf, $pos, nqp::readuint($buf, $pos, $ne8) +& 0x7F, $ne8);
+                            $pos += 4;
+
+                            # XXXX: 16-bit NaN support version
+                            # if $nan[3] || $nan[2] +& 3 {
+                            #     nqp::writeuint($buf, $pos++, CBOR_SVal + CBOR_4Byte, $ne8);
+                            #     nqp::writenum($buf, $pos, $nan32, $be32);
+
+                            #     # Canonify NaN sign bit to 0, even on platforms with -NaN
+                            #     nqp::writeuint($buf, $pos, nqp::readuint($buf, $pos, $ne8) +& 0x7F, $ne8);
+                            #     $pos += 4;
+                            # }
+                            # else {
+                            #     nqp::writeuint($buf, $pos++, CBOR_SVal + CBOR_2Byte, $ne8);
+                            #     nqp::writeuint($buf, $pos, bin16-from-num($nan32), $be16);
+                            #     $pos += 2;
+                            # }
+                        }
+                        else {
+                            nqp::writeuint($buf, $pos++, CBOR_SVal + CBOR_8Byte, $ne8);
+                            nqp::writenum($buf, $pos, $_, $be64);
+
+                            # Canonify NaN sign bit to 0, even on platforms with -NaN
+                            nqp::writeuint($buf, $pos, nqp::readuint($buf, $pos, $ne8) +& 0x7F, $ne8);
+                            $pos += 8;
+                        }
+                    }
+                    elsif (my num32 $num32 = $_) == $_ {
+                        # XXXX: 16-bit num support path
+                        # my $bin16 = bin16-from-num($_);
+                        # my $num16 = num-from-bin16($bin16);
+                        # if $num16 == $_ {
+                        #     nqp::writeuint($buf, $pos++, CBOR_SVal + CBOR_2Byte, $ne8);
+                        #     nqp::writeuint($buf, $pos, $bin16, $be16);
+                        #     $pos += 2;
+                        # }
                         nqp::writeuint($buf, $pos++, CBOR_SVal + CBOR_4Byte, $ne8);
                         nqp::writenum($buf, $pos, $num32, $be32);
-
-                        # Canonify NaN sign bit to 0, even on platforms with -NaN
-                        nqp::writeuint($buf, $pos, nqp::readuint($buf, $pos, $ne8) +& 0x7F, $ne8)
-                            if $isnan;
-
                         $pos += 4;
                     }
                     else {
                         nqp::writeuint($buf, $pos++, CBOR_SVal + CBOR_8Byte, $ne8);
                         nqp::writenum($buf, $pos, $_, $be64);
-
-                        # Canonify NaN sign bit to 0, even on platforms with -NaN
-                        nqp::writeuint($buf, $pos, nqp::readuint($buf, $pos, $ne8) +& 0x7F, $ne8)
-                            if $isnan;
-
                         $pos += 8;
                     }
                 }
