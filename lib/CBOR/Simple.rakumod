@@ -1041,7 +1041,7 @@ Currently known NOT to work:
 
 =item Encoding 16-bit floats (num16) -- decoding num16 works
 
-=item Special decoding for registered tags other than numbers 0..5 and 30
+=item Special decoding for registered tags other than numbers 0..5, 30, and 55799
 
 
 =head2 DATETIME AND INSTANT
