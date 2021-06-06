@@ -114,24 +114,28 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
         elsif $value <= CBOR_Max_UInt_2Byte {
             nqp::writeuint($buf, $pos++, $major-type + CBOR_2Byte, $ne8);
             nqp::writeuint($buf, $pos, $value, $be16);
-            $pos += 2;
+            # $pos += 2;
+            $pos = nqp::add_I(nqp::decont($pos), 2, Int);
         }
         elsif $value <= CBOR_Max_UInt_4Byte {
             nqp::writeuint($buf, $pos++, $major-type + CBOR_4Byte, $ne8);
             nqp::writeuint($buf, $pos, $value, $be32);
-            $pos += 4;
+            # $pos += 4;
+            $pos = nqp::add_I(nqp::decont($pos), 4, Int);
         }
         else {
             nqp::writeuint($buf, $pos++, $major-type + CBOR_8Byte, $ne8);
             nqp::writeuint($buf, $pos, $value, $be64);
-            $pos += 8;
+            # $pos += 8;
+            $pos = nqp::add_I(nqp::decont($pos), 8, Int);
         }
     }
 
     my sub write-medium-uint(int $major-type, $value) {
         nqp::writeuint($buf, $pos++, $major-type + CBOR_8Byte, $ne8);
         $buf.write-uint64($pos, $value, BigEndian);
-        $pos += 8;
+        # $pos += 8;
+        $pos = nqp::add_I(nqp::decont($pos), 8, Int);
     }
 
     my &encode = -> $value {
@@ -186,7 +190,8 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
 
                             # Canonify NaN sign bit to 0, even on platforms with -NaN
                             nqp::writeuint($buf, $pos, nqp::readuint($buf, $pos, $ne8) +& 0x7F, $ne8);
-                            $pos += 4;
+                            # $pos += 4;
+                            $pos = nqp::add_I(nqp::decont($pos), 4, Int);
 
                             # XXXX: 16-bit NaN support version
                             # if $nan[3] || $nan[2] +& 3 {
@@ -209,7 +214,8 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
 
                             # Canonify NaN sign bit to 0, even on platforms with -NaN
                             nqp::writeuint($buf, $pos, nqp::readuint($buf, $pos, $ne8) +& 0x7F, $ne8);
-                            $pos += 8;
+                            # $pos += 8;
+                            $pos = nqp::add_I(nqp::decont($pos), 8, Int);
                         }
                     }
                     elsif (my num32 $num32 = $_) == $_ {
@@ -223,12 +229,14 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                         # }
                         nqp::writeuint($buf, $pos++, CBOR_SVal + CBOR_4Byte, $ne8);
                         nqp::writenum($buf, $pos, $num32, $be32);
-                        $pos += 4;
+                        # $pos += 4;
+                        $pos = nqp::add_I(nqp::decont($pos), 4, Int);
                     }
                     else {
                         nqp::writeuint($buf, $pos++, CBOR_SVal + CBOR_8Byte, $ne8);
                         nqp::writenum($buf, $pos, $_, $be64);
-                        $pos += 8;
+                        # $pos += 8;
+                        $pos = nqp::add_I(nqp::decont($pos), 8, Int);
                     }
                 }
                 elsif nqp::istype($_, Rational) {
@@ -458,21 +466,21 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                     nqp::iseq_i($argument, CBOR_2Byte),
                     nqp::stmts(
                         ($v = nqp::readuint($cbor, $pos, $be16)),
-                        ($pos += 2),
+                        ($pos = nqp::add_I(nqp::decont($pos), 2, Int)),
                         $v
                     ),
                     nqp::if(
                         nqp::iseq_i($argument, CBOR_4Byte),
                         nqp::stmts(
                             ($v = nqp::readuint($cbor, $pos, $be32)),
-                            ($pos += 4),
+                            ($pos = nqp::add_I(nqp::decont($pos), 4, Int)),
                             $v
                         ),
                         nqp::if(
                             nqp::iseq_i($argument, CBOR_8Byte),
                             nqp::stmts(
                                 (my $v64 = nqp::readuint($cbor, $pos, $be64)),
-                                ($pos += 8),
+                                ($pos = nqp::add_I(nqp::decont($pos), 8, Int)),
                                 $v64
                             ),
                             fail-malformed("Invalid argument $argument")
@@ -780,17 +788,20 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             }
             elsif $argument == CBOR_8Byte {
                 my num64 $v = $cbor.read-num64($pos, BigEndian);
-                $pos += 8;
+                # $pos += 8;
+                $pos = nqp::add_I(nqp::decont($pos), 8, Int);
                 $v
             }
             elsif $argument == CBOR_4Byte {
                 my num32 $v = $cbor.read-num32($pos, BigEndian);
-                $pos += 4;
+                # $pos += 4;
+                $pos = nqp::add_I(nqp::decont($pos), 8, Int);
                 $v
             }
             elsif $argument == CBOR_2Byte {
                 my num32 $v = num-from-bin16($cbor.read-uint16($pos, BigEndian));
-                $pos += 2;
+                # $pos += 2;
+                $pos = nqp::add_I(nqp::decont($pos), 8, Int);
                 $v
             }
             elsif $argument == CBOR_1Byte {
