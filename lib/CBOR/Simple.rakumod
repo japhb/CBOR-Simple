@@ -226,7 +226,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                         }
                     }
                     # Can safely shrink to 32 bits with no loss of information
-                    elsif (my num32 $num32 = $_) == $_ {
+                    elsif nqp::iseq_n($_, (my num32 $num32 = $_)) {
                         # XXXX: 16-bit num support path
                         # my $bin16 = bin16-from-num($_);
                         # my $num16 = num-from-bin16($bin16);
