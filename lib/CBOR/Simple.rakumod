@@ -773,11 +773,25 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         else { # $major-type == CBOR_SVal
             my constant %svals = 20 => False, 21 => True, 22 => Any, 23 => Mu;
 
-            if $argument < CBOR_False {
-                fail-malformed "Unassigned simple value $argument";
+            if $argument <= CBOR_Undef {
+                $argument < CBOR_False
+                    ?? fail-malformed("Unassigned simple value $argument")
+                    !! %svals{$argument}
             }
-            elsif $argument <= CBOR_Undef {
-                %svals{$argument}
+            elsif $argument == CBOR_8Byte {
+                my num64 $v = $cbor.read-num64($pos, BigEndian);
+                $pos += 8;
+                $v
+            }
+            elsif $argument == CBOR_4Byte {
+                my num32 $v = $cbor.read-num32($pos, BigEndian);
+                $pos += 4;
+                $v
+            }
+            elsif $argument == CBOR_2Byte {
+                my num32 $v = num-from-bin16($cbor.read-uint16($pos, BigEndian));
+                $pos += 2;
+                $v
             }
             elsif $argument == CBOR_1Byte {
                 my $val  = nqp::readuint($cbor, $pos++, $ne8);
@@ -785,21 +799,6 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                            $val < 32 ?? "Reserved"     !!
                                         "Unassigned"   ;
                 fail-malformed "$fail simple value $val";
-            }
-            elsif $argument == CBOR_2Byte {
-                my $v = num-from-bin16($cbor.read-uint16($pos, BigEndian));
-                $pos += 2;
-                $v
-            }
-            elsif $argument == CBOR_4Byte {
-                my $v = $cbor.read-num32($pos, BigEndian);
-                $pos += 4;
-                $v
-            }
-            elsif $argument == CBOR_8Byte {
-                my $v = $cbor.read-num64($pos, BigEndian);
-                $pos += 8;
-                $v
             }
             elsif $argument == CBOR_Indefinite_Break {
                 $breakable ?? Break
