@@ -154,7 +154,8 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             # Check for Numeric before Stringy so allomorphs prefer Numeric
             if nqp::istype($_, Numeric) {
                 if nqp::istype($_, Bool) {
-                    nqp::writeuint($buf, $pos++, CBOR_SVal + ($_ ?? CBOR_True !! CBOR_False), $ne8);
+                    nqp::writeuint($buf, $pos++, ($_ ?? CBOR_SVal + CBOR_True
+                                                     !! CBOR_SVal + CBOR_False), $ne8);
                 }
                 elsif nqp::istype($_, Int) {
                     # Small int
@@ -295,18 +296,17 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             }
             elsif nqp::istype($_, Stringy) {
                 if nqp::istype($_, Str) {
-                    my $utf8 := $utf8-encoder.encode-chars($_);
-                    my $bytes = nqp::elems($utf8);
-                    write-uint(CBOR_TStr, $bytes);
+                    write-uint(CBOR_TStr,
+                               my $bytes := nqp::elems(
+                                   my $utf8 := $utf8-encoder.encode-chars($_)));
+
                     nqp::splice($buf, $utf8, $pos, $bytes);
-                    $pos += $bytes;
+                    $pos = nqp::add_I(nqp::decont($pos), $bytes, Int);
                 }
                 elsif nqp::istype($_, Blob) {
-                    my $bytes = .bytes;
-
-                    write-uint(CBOR_BStr, $bytes);
+                    write-uint(CBOR_BStr, my $bytes := .bytes);
                     $buf.splice($pos, $bytes, $_);
-                    $pos += $bytes;
+                    $pos = nqp::add_I(nqp::decont($pos), $bytes, Int);
                 }
                 else {
                     my $ex = "Don't know how to encode a {$value.^name}";
@@ -382,7 +382,7 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     else {
                         # XXXX: Fake other packed array types by writing them
                         #       as standard Arrays instead
-                        write-uint(CBOR_Array, .elems);
+                        write-uint(CBOR_Array, $elems);
                         encode($_) for @$_;
                     }
                 }
