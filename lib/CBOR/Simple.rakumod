@@ -578,26 +578,30 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         my %mu-map{Mu};
 
         # Indefinite length
-        if $argument == CBOR_Indefinite_Break {
-            loop {
-                my $k := cbor-decode($cbor, $pos, :breakable);
-                last if $k =:= Break;
-                (nqp::istype($k, Str) ?? %str-map !! %mu-map){$k} = decode;
+        if nqp::iseq_i($argument, CBOR_Indefinite_Break) {
+            until (my $k := cbor-decode($cbor, $pos, :breakable)) =:= Break {
+                nqp::istype($k, Str) ?? %str-map.ASSIGN-KEY($k, decode)
+                                     !! (%mu-map.AT-KEY($k) = decode);
             }
         }
         # Definite length
         else {
-            (nqp::istype((my $k = decode), Str) ?? %str-map !! %mu-map){$k} = decode
-                for ^read-uint;
+            my int $elems = read-uint;
+            my int $i     = 0;
+
+            nqp::while(
+                nqp::isle_i($i = nqp::add_i($i, 1), $elems),
+                nqp::if(
+                    nqp::istype((my $k = decode), Str),
+                    %str-map.ASSIGN-KEY($k, decode),
+                    (%mu-map.AT-KEY($k) = decode)
+                )
+            );
         }
 
-        if %mu-map.elems {
-            %mu-map{$_} = %str-map{$_} for %str-map.keys;
-            %mu-map
-        }
-        else {
-            %str-map
-        }
+        %mu-map.elems
+        ?? nqp::stmts((%mu-map{$_} = %str-map{$_} for %str-map.keys), %mu-map)
+        !! %str-map
     }
 
     my &decode-sval = {
