@@ -536,7 +536,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
 
     my &decode-tstr = {
         # Indefinite length
-        if $argument == CBOR_Indefinite_Break && !$breakable {
+        if nqp::iseq_i($argument, CBOR_Indefinite_Break) && !$breakable {
             my @chunks;
             until (my $chunk := cbor-decode($cbor, $pos, :breakable)) =:= Break {
                 fail-malformed "Text string chunk has wrong type"
@@ -546,12 +546,12 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             @chunks.join
         }
         # Definite length
-        elsif (my $bytes = read-uint) {
+        elsif (my $bytes := read-uint) {
             fail-malformed "Unreasonably long text string"
                 if $bytes > CBOR_Max_UInt_63Bit;
 
             fail-malformed "Text string too short"
-                unless $cbor-length >= (my $a = $pos + $bytes);
+                unless $cbor-length >= (my $a := $pos + $bytes);
 
             my $str := nqp::p6box_s(nqp::decode(nqp::slice($cbor, $pos, $a - 1), 'utf8'));
             $pos = $a;
