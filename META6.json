@@ -6,7 +6,7 @@
   "build-depends": [
   ],
   "depends": [
-    "TinyFloats:ver<0.0.2+>"
+    "TinyFloats:ver<0.0.3+>"
   ],
   "description": "Simple codec for the CBOR serialization format",
   "license": "Artistic-2.0",
@@ -22,5 +22,5 @@
   ],
   "test-depends": [
   ],
-  "version": "0.0.8"
+  "version": "0.0.9"
 }
