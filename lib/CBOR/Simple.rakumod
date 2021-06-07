@@ -103,32 +103,40 @@ multi cbor-encode(Mu $value, :$cbor-self-tag) is export {
 
 # Encode an arbitrary value to CBOR, specifying a buffer position to begin writing
 multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export {
-    my sub write-uint(int $major-type, int $value) {
-        if $value < CBOR_1Byte {
-            nqp::writeuint($buf, $pos++, $major-type + $value, $ne8);
-        }
-        elsif $value <= CBOR_Max_UInt_1Byte {
-            nqp::writeuint($buf, $pos++, $major-type + CBOR_1Byte, $ne8);
-            nqp::writeuint($buf, $pos++, $value, $ne8);
-        }
-        elsif $value <= CBOR_Max_UInt_2Byte {
-            nqp::writeuint($buf, $pos++, $major-type + CBOR_2Byte, $ne8);
-            nqp::writeuint($buf, $pos, $value, $be16);
-            # $pos += 2;
-            $pos = nqp::add_I(nqp::decont($pos), 2, Int);
-        }
-        elsif $value <= CBOR_Max_UInt_4Byte {
-            nqp::writeuint($buf, $pos++, $major-type + CBOR_4Byte, $ne8);
-            nqp::writeuint($buf, $pos, $value, $be32);
-            # $pos += 4;
-            $pos = nqp::add_I(nqp::decont($pos), 4, Int);
-        }
-        else {
-            nqp::writeuint($buf, $pos++, $major-type + CBOR_8Byte, $ne8);
-            nqp::writeuint($buf, $pos, $value, $be64);
-            # $pos += 8;
-            $pos = nqp::add_I(nqp::decont($pos), 8, Int);
-        }
+    # This gets called a LOT, so go for speed
+    my &write-uint = -> int $major-type, int $value {
+        nqp::if(
+            nqp::islt_i($value, CBOR_1Byte),
+            nqp::writeuint($buf, $pos++, nqp::add_i($major-type, $value), $ne8),
+            nqp::if(
+                nqp::isle_i($value, CBOR_Max_UInt_1Byte),
+                nqp::stmts(
+                    nqp::writeuint($buf, $pos++, nqp::add_i($major-type, CBOR_1Byte), $ne8),
+                    nqp::writeuint($buf, $pos++, $value, $ne8),
+                ),
+                nqp::if(
+                    nqp::isle_i($value, CBOR_Max_UInt_2Byte),
+                    nqp::stmts(
+                        nqp::writeuint($buf, $pos++, nqp::add_i($major-type, CBOR_2Byte), $ne8),
+                        nqp::writeuint($buf, $pos, $value, $be16),
+                        ($pos = nqp::add_I(nqp::decont($pos), 2, Int)),
+                    ),
+                    nqp::if(
+                        nqp::isle_i($value, CBOR_Max_UInt_4Byte),
+                        nqp::stmts(
+                            nqp::writeuint($buf, $pos++, nqp::add_i($major-type, CBOR_4Byte), $ne8),
+                            nqp::writeuint($buf, $pos, $value, $be32),
+                            ($pos = nqp::add_I(nqp::decont($pos), 4, Int)),
+                        ),
+                        nqp::stmts(
+                            nqp::writeuint($buf, $pos++, nqp::add_i($major-type, CBOR_8Byte), $ne8),
+                            nqp::writeuint($buf, $pos, $value, $be64),
+                            ($pos = nqp::add_I(nqp::decont($pos), 8, Int)),
+                        )
+                    )
+                )
+            )
+        )
     }
 
     my sub write-medium-uint(int $major-type, $value) {
