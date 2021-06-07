@@ -501,11 +501,12 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
     }
 
     my &decode = {
-        my int $initial-byte = nqp::readuint($cbor, $pos++, $ne8);
-        my int $major-type   = $initial-byte +& CBOR_MajorType_Mask;
-        $argument = $initial-byte +& CBOR_Argument_Mask;
+        $argument = nqp::bitand_i(
+            my int $initial-byte = nqp::readuint($cbor, $pos++, $ne8),
+            CBOR_Argument_Mask);
 
-        $major-type == CBOR_UInt ??   read-uint() !!
+        (my int $major-type = nqp::bitand_i($initial-byte, CBOR_MajorType_Mask))
+                    == CBOR_UInt ??   read-uint() !!
         $major-type == CBOR_NInt ?? +^read-uint() !!
         do if $major-type == CBOR_BStr {
             # Indefinite length
@@ -611,18 +612,20 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                                        $on-little-endian ?? BigEndian    !!
                                                             LittleEndian;
 
-                # Look at tagged content
-                my int $initial-byte = nqp::readuint($cbor, $pos++, $ne8);
-                my int $major-type   = $initial-byte +& CBOR_MajorType_Mask;
-                $argument            = $initial-byte +& CBOR_Argument_Mask;
-                my $bytes            = read-uint;
-                my int $elems        = $bytes div $size;
-
-                # Check that it is a byte string, with an even number of elements
+                # Look at tagged content and check that it is a byte string
+                $argument = nqp::bitand_i(
+                    my int $initial-byte = nqp::readuint($cbor, $pos++, $ne8),
+                    CBOR_Argument_Mask);
                 fail-malformed "Typed Array tag ($tag-number) does not contain a byte string"
-                    unless $major-type == CBOR_BStr;
+                    unless nqp::bitand_i($initial-byte, CBOR_MajorType_Mask) == CBOR_BStr;
+
+                # Check that the byte string has an even number of elements
+                my $bytes = read-uint;
                 fail-malformed "Typed Array with element size $size does not evenly divide byte length $bytes"
                     if $bytes % $size;
+
+                # Determine actual element count
+                my int $elems = $bytes div $size;
 
                 # Parse out the actual array
                 if $is-float {
