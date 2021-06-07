@@ -500,337 +500,352 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         )
     }
 
+    my &decode-bstr = {
+        # Indefinite length
+        if $argument == CBOR_Indefinite_Break && !$breakable {
+            my buf8 $joined .= new;
+            until (my $chunk := cbor-decode($cbor, $pos, :breakable)) =:= Break {
+                fail-malformed "Byte string chunk has wrong type"
+                    unless nqp::istype($chunk, Buf);
+                $joined.append($chunk);
+            }
+            $joined
+        }
+        # Definite length
+        elsif (my $bytes = read-uint) {
+            fail-malformed "Unreasonably long byte string"
+                if $bytes > CBOR_Max_UInt_63Bit;
+
+            fail-malformed "Byte string too short"
+                unless $cbor-length >= (my $a = $pos + $bytes);
+
+            my $buf := nqp::slice($cbor, $pos, $a - 1);
+            $pos = $a;
+            $buf
+        }
+        else { buf8.new }
+    }
+
+    my &decode-tstr = {
+        # Indefinite length
+        if $argument == CBOR_Indefinite_Break && !$breakable {
+            my @chunks;
+            until (my $chunk := cbor-decode($cbor, $pos, :breakable)) =:= Break {
+                fail-malformed "Text string chunk has wrong type"
+                    unless nqp::istype($chunk, Str);
+                @chunks.push($chunk);
+            }
+            @chunks.join
+        }
+        # Definite length
+        elsif (my $bytes = read-uint) {
+            fail-malformed "Unreasonably long text string"
+                if $bytes > CBOR_Max_UInt_63Bit;
+
+            fail-malformed "Text string too short"
+                unless $cbor-length >= (my $a = $pos + $bytes);
+
+            my $str := nqp::p6box_s(nqp::decode(nqp::slice($cbor, $pos, $a - 1), 'utf8'));
+            $pos = $a;
+            $str
+        }
+        else { '' }
+    }
+
+    my &decode-array = {
+        # Indefinite length
+        $argument == CBOR_Indefinite_Break
+        ?? do {
+            my @array;
+            until (my $item := cbor-decode($cbor, $pos, :breakable)) =:= Break {
+                @array.push($item);
+            }
+            @array
+        }
+        !! my @ = (^read-uint).map(&decode)
+    }
+
+    my &decode-map = {
+        my %str-map;
+        my %mu-map{Mu};
+
+        # Indefinite length
+        if $argument == CBOR_Indefinite_Break {
+            loop {
+                my $k := cbor-decode($cbor, $pos, :breakable);
+                last if $k =:= Break;
+                (nqp::istype($k, Str) ?? %str-map !! %mu-map){$k} = decode;
+            }
+        }
+        # Definite length
+        else {
+            (nqp::istype((my $k = decode), Str) ?? %str-map !! %mu-map){$k} = decode
+                for ^read-uint;
+        }
+
+        if %mu-map.elems {
+            %mu-map{$_} = %str-map{$_} for %str-map.keys;
+            %mu-map
+        }
+        else {
+            %str-map
+        }
+    }
+
+    my &decode-sval = {
+        my constant %svals = 20 => False, 21 => True, 22 => Any, 23 => Mu;
+
+        if $argument <= CBOR_Undef {
+            $argument < CBOR_False
+                ?? fail-malformed("Unassigned simple value $argument")
+                !! %svals{$argument}
+        }
+        elsif $argument == CBOR_8Byte {
+            my num64 $v = $cbor.read-num64($pos, BigEndian);
+            # $pos += 8;
+            $pos = nqp::add_I(nqp::decont($pos), 8, Int);
+            $v
+        }
+        elsif $argument == CBOR_4Byte {
+            my num32 $v = $cbor.read-num32($pos, BigEndian);
+            # $pos += 4;
+            $pos = nqp::add_I(nqp::decont($pos), 8, Int);
+            $v
+        }
+        elsif $argument == CBOR_2Byte {
+            my num32 $v = num-from-bin16($cbor.read-uint16($pos, BigEndian));
+            # $pos += 2;
+            $pos = nqp::add_I(nqp::decont($pos), 8, Int);
+            $v
+        }
+        elsif $argument == CBOR_1Byte {
+            my $val  = nqp::readuint($cbor, $pos++, $ne8);
+            my $fail = $val < 24 ?? "Badly formed" !!
+                       $val < 32 ?? "Reserved"     !!
+                                    "Unassigned"   ;
+            fail-malformed "$fail simple value $val";
+        }
+        elsif $argument == CBOR_Indefinite_Break {
+            $breakable ?? Break
+                       !! fail-malformed "Unexpected break signal";
+        }
+        else {
+            fail-malformed "Badly formed simple value $argument";
+        }
+    }
+
+    my &decode-tag = {
+        my $tag-number = read-uint;
+        if 64 <= $tag-number <= 87 {  # RFC 8746 Typed Arrays; details bit-coded in tag
+            # Decode tag
+            my $is-float         = $tag-number +& 24 == 16;
+            my $is-signed        = $tag-number +& 8;
+            my $is-little-endian = $tag-number +& 4;
+            my $size             = 1 +< ($tag-number +& 3 + $is-float);
+
+            # Determine Endian type to read with
+            my $on-little-endian = Kernel.endian == LittleEndian;
+            my $is-same-endian   = !($is-little-endian ?^ $on-little-endian);
+            my $endian           = $is-same-endian   ?? NativeEndian !!
+                                   $on-little-endian ?? BigEndian    !!
+                                                        LittleEndian;
+
+            # Look at tagged content and check that it is a byte string
+            $argument = nqp::bitand_i(
+                my int $initial-byte = nqp::readuint($cbor, $pos++, $ne8),
+                CBOR_Argument_Mask);
+            fail-malformed "Typed Array tag ($tag-number) does not contain a byte string"
+                unless nqp::bitand_i($initial-byte, CBOR_MajorType_Mask) == CBOR_BStr;
+
+            # Check that the byte string has an even number of elements
+            my $bytes = read-uint;
+            fail-malformed "Typed Array with element size $size does not evenly divide byte length $bytes"
+                if $bytes % $size;
+
+            # Determine actual element count
+            my int $elems = $bytes div $size;
+
+            # Parse out the actual array
+            if $is-float {
+                if $size == 2 {
+                    my $array := array[num32].new;
+
+                    # Presize array to reduce copying
+                    nqp::setelems($array, $elems);
+
+                    # We can't just memcopy, so apply NQP afterburners instead
+                    my int $p = $pos;
+                    my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_16_BIT, $endian);
+                    my int $i = -1;
+                    nqp::while(
+                        nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                        nqp::bindpos_n($array, $i,
+                                       num-from-bin16(
+                                           nqp::readuint($cbor,
+                                                         nqp::add_i($p, nqp::bitshiftl_i($i,1)),
+                                                         $t)))
+                    );
+
+                    $pos += $bytes;
+                    $array
+                }
+                elsif $size == 4 {
+                    my $array := array[num32].new;
+
+                    # Presize array to reduce copying
+                    nqp::setelems($array, $elems);
+
+                    # We can't just memcopy, so apply NQP afterburners instead
+                    my int $p = $pos;
+                    my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_32_BIT, $endian);
+                    my int $i = -1;
+                    nqp::while(
+                        nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                        nqp::bindpos_n($array, $i,
+                                       nqp::readnum($cbor,
+                                                    nqp::add_i($p,
+                                                               nqp::bitshiftl_i($i, 2)),
+                                                    $t))
+                    );
+
+                    $pos += $bytes;
+                    $array
+                }
+                elsif $size == 8 {
+                    my $array := array[num64].new;
+
+                    # Presize array to reduce copying
+                    nqp::setelems($array, $elems);
+
+                    # We can't just memcopy, so apply NQP afterburners instead
+                    my int $p = $pos;
+                    my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_64_BIT, $endian);
+                    my int $i = -1;
+                    nqp::while(
+                        nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                        nqp::bindpos_n($array, $i,
+                                       nqp::readnum($cbor,
+                                                    nqp::add_i($p,
+                                                               nqp::bitshiftl_i($i, 3)),
+                                                    $t))
+                    );
+
+                    $pos += $bytes;
+                    $array
+                }
+                else {
+                    die "Unable to parse native float array with element size $size";
+                }
+            }
+            else {
+                ... "Support decoding intarray";
+            }
+        }
+        elsif $tag-number == CBOR_Tag_Rational {
+            fail-malformed "Rational tag (30) does not contain an array with exactly two elements"
+                unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_Array + 2;
+
+            my $nu = decode;
+            my $de = decode;
+            fail-malformed "Rational tag (30) numerator is not an integer"
+                unless nqp::istype($nu, Int);
+            fail-malformed "Rational tag (30) denominator is not a positive integer"
+                unless nqp::istype($de, Int) && $de > 0;
+
+            $de <= CBOR_Max_UInt_8Byte ?? Rat.new(   $nu, $de)
+                                       !! FatRat.new($nu, $de)
+        }
+        elsif $tag-number == CBOR_Tag_DateTime_Number {
+            my $seconds := decode;
+            fail-malformed "Epoch DateTime tag(1) does not contain a real number"
+                unless nqp::istype($seconds, Real);
+            Instant.from-posix($seconds) // fail-malformed "Epoch DateTime could not be decoded"
+        }
+        elsif $tag-number == CBOR_Tag_DateTime_String {
+            my $dt := decode;
+            fail-malformed "DateTime tag (0) does not contain a string"
+                unless nqp::istype($dt, Str);
+            DateTime.new($dt) // fail-malformed "DateTime string could not be parsed"
+        }
+        elsif $tag-number == CBOR_Tag_Unsigned_BigInt {
+            my $bytes := decode;
+            fail-malformed "Unsigned BigInt does not contain a byte string"
+                unless nqp::istype($bytes, Buf);
+            my $value = 0;
+            $value = $value * 256 + $_ for @$bytes;
+            $value
+        }
+        elsif $tag-number == CBOR_Tag_Negative_BigInt {
+            my $bytes := decode;
+            fail-malformed "Negative BigInt does not contain a byte string"
+                unless nqp::istype($bytes, Buf);
+            my $value = 0;
+            $value = $value * 256 + $_ for @$bytes;
+            +^$value
+        }
+        elsif $tag-number == CBOR_Tag_Decimal_Fraction {
+            fail-malformed "Decimal Fraction tag (4) does not contain an array with exactly two elements"
+                unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_Array + 2;
+
+            my $exp = decode;
+            my $man = decode;
+            fail-malformed "Decimal Fraction tag (4) exponent is not an integer"
+                unless nqp::istype($exp, Int);
+            fail-malformed "Decimal Fraction tag (4) mantissa is not an integer"
+                unless nqp::istype($man, Int);
+
+            $exp >= 0 ?? $man * 10 ** $exp !! do {
+                my $de = 10 ** -$exp;
+                $de <= CBOR_Max_UInt_8Byte ?? Rat.new(   $man, $de)
+                                           !! FatRat.new($man, $de)
+            }
+        }
+        elsif $tag-number == CBOR_Tag_Bigfloat {
+            fail-malformed "Bigfloat tag (5) does not contain an array with exactly two elements"
+                unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_Array + 2;
+
+            my $exp = decode;
+            my $man = decode;
+            fail-malformed "Bigfloat tag (5) exponent is not an integer"
+                unless nqp::istype($exp, Int);
+            fail-malformed "Bigfloat tag (5) mantissa is not an integer"
+                unless nqp::istype($man, Int);
+
+            $exp >= 0 ?? $man * 2 ** $exp !! do {
+                my $de = 2 ** -$exp;
+                $de <= CBOR_Max_UInt_8Byte ?? Rat.new(   $man, $de)
+                                           !! FatRat.new($man, $de)
+            }
+        }
+        # Self-tagged CBOR, just unwrap the decoded tag content
+        elsif $tag-number == CBOR_Tag_Self_Described {
+            decode
+        }
+        # XXXX: skipped tags 16..18, 21..29
+        # XXXX: Handle more special tags
+
+        else {
+            Tagged.new(:$tag-number, :value(decode))
+        }
+    }
+
+    my @decoders =
+        &read-uint,
+        { +^read-uint },
+        &decode-bstr,
+        &decode-tstr,
+        &decode-array,
+        &decode-map,
+        &decode-tag,
+        &decode-sval;
+
     my &decode = {
         $argument = nqp::bitand_i(
             my int $initial-byte = nqp::readuint($cbor, $pos++, $ne8),
             CBOR_Argument_Mask);
 
-        (my int $major-type = nqp::bitand_i($initial-byte, CBOR_MajorType_Mask))
-                    == CBOR_UInt ??   read-uint() !!
-        $major-type == CBOR_NInt ?? +^read-uint() !!
-        do if $major-type == CBOR_BStr {
-            # Indefinite length
-            if $argument == CBOR_Indefinite_Break && !$breakable {
-                my buf8 $joined .= new;
-                until (my $chunk := cbor-decode($cbor, $pos, :breakable)) =:= Break {
-                    fail-malformed "Byte string chunk has wrong type"
-                        unless nqp::istype($chunk, Buf);
-                    $joined.append($chunk);
-                }
-                $joined
-            }
-            # Definite length
-            elsif (my $bytes = read-uint) {
-                fail-malformed "Unreasonably long byte string"
-                    if $bytes > CBOR_Max_UInt_63Bit;
-
-                fail-malformed "Byte string too short"
-                    unless $cbor-length >= (my $a = $pos + $bytes);
-
-                my $buf := nqp::slice($cbor, $pos, $a - 1);
-                $pos = $a;
-                $buf
-            }
-            else { buf8.new }
-        }
-        elsif $major-type == CBOR_TStr {
-            # Indefinite length
-            if $argument == CBOR_Indefinite_Break && !$breakable {
-                my @chunks;
-                until (my $chunk := cbor-decode($cbor, $pos, :breakable)) =:= Break {
-                    fail-malformed "Text string chunk has wrong type"
-                        unless nqp::istype($chunk, Str);
-                    @chunks.push($chunk);
-                }
-                @chunks.join
-            }
-            # Definite length
-            elsif (my $bytes = read-uint) {
-                fail-malformed "Unreasonably long text string"
-                    if $bytes > CBOR_Max_UInt_63Bit;
-
-                fail-malformed "Text string too short"
-                    unless $cbor-length >= (my $a = $pos + $bytes);
-
-                my $str := nqp::p6box_s(nqp::decode(nqp::slice($cbor, $pos, $a - 1), 'utf8'));
-                $pos = $a;
-                $str
-            }
-            else { '' }
-        }
-        elsif $major-type == CBOR_Array {
-            # Indefinite length
-            $argument == CBOR_Indefinite_Break
-            ?? do {
-                my @array;
-                until (my $item := cbor-decode($cbor, $pos, :breakable)) =:= Break {
-                    @array.push($item);
-                }
-                @array
-            }
-            !! my @ = (^read-uint).map(&decode)
-        }
-        elsif $major-type == CBOR_Map {
-            my %str-map;
-            my %mu-map{Mu};
-
-            # Indefinite length
-            if $argument == CBOR_Indefinite_Break {
-                loop {
-                    my $k := cbor-decode($cbor, $pos, :breakable);
-                    last if $k =:= Break;
-                    (nqp::istype($k, Str) ?? %str-map !! %mu-map){$k} = decode;
-                }
-            }
-            # Definite length
-            else {
-                (nqp::istype((my $k = decode), Str) ?? %str-map !! %mu-map){$k} = decode
-                    for ^read-uint;
-            }
-
-            if %mu-map.elems {
-                %mu-map{$_} = %str-map{$_} for %str-map.keys;
-                %mu-map
-            }
-            else {
-                %str-map
-            }
-        }
-        elsif $major-type == CBOR_Tag {
-            my $tag-number = read-uint;
-            if 64 <= $tag-number <= 87 {  # RFC 8746 Typed Arrays; details bit-coded in tag
-                # Decode tag
-                my $is-float         = $tag-number +& 24 == 16;
-                my $is-signed        = $tag-number +& 8;
-                my $is-little-endian = $tag-number +& 4;
-                my $size             = 1 +< ($tag-number +& 3 + $is-float);
-
-                # Determine Endian type to read with
-                my $on-little-endian = Kernel.endian == LittleEndian;
-                my $is-same-endian   = !($is-little-endian ?^ $on-little-endian);
-                my $endian           = $is-same-endian   ?? NativeEndian !!
-                                       $on-little-endian ?? BigEndian    !!
-                                                            LittleEndian;
-
-                # Look at tagged content and check that it is a byte string
-                $argument = nqp::bitand_i(
-                    my int $initial-byte = nqp::readuint($cbor, $pos++, $ne8),
-                    CBOR_Argument_Mask);
-                fail-malformed "Typed Array tag ($tag-number) does not contain a byte string"
-                    unless nqp::bitand_i($initial-byte, CBOR_MajorType_Mask) == CBOR_BStr;
-
-                # Check that the byte string has an even number of elements
-                my $bytes = read-uint;
-                fail-malformed "Typed Array with element size $size does not evenly divide byte length $bytes"
-                    if $bytes % $size;
-
-                # Determine actual element count
-                my int $elems = $bytes div $size;
-
-                # Parse out the actual array
-                if $is-float {
-                    if $size == 2 {
-                        my $array := array[num32].new;
-
-                        # Presize array to reduce copying
-                        nqp::setelems($array, $elems);
-
-                        # We can't just memcopy, so apply NQP afterburners instead
-                        my int $p = $pos;
-                        my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_16_BIT, $endian);
-                        my int $i = -1;
-                        nqp::while(
-                            nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
-                            nqp::bindpos_n($array, $i,
-                                           num-from-bin16(
-                                               nqp::readuint($cbor,
-                                                             nqp::add_i($p, nqp::bitshiftl_i($i,1)),
-                                                             $t)))
-                        );
-
-                        $pos += $bytes;
-                        $array
-                    }
-                    elsif $size == 4 {
-                        my $array := array[num32].new;
-
-                        # Presize array to reduce copying
-                        nqp::setelems($array, $elems);
-
-                        # We can't just memcopy, so apply NQP afterburners instead
-                        my int $p = $pos;
-                        my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_32_BIT, $endian);
-                        my int $i = -1;
-                        nqp::while(
-                            nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
-                            nqp::bindpos_n($array, $i,
-                                           nqp::readnum($cbor,
-                                                        nqp::add_i($p,
-                                                                   nqp::bitshiftl_i($i, 2)),
-                                                        $t))
-                        );
-
-                        $pos += $bytes;
-                        $array
-                    }
-                    elsif $size == 8 {
-                        my $array := array[num64].new;
-
-                        # Presize array to reduce copying
-                        nqp::setelems($array, $elems);
-
-                        # We can't just memcopy, so apply NQP afterburners instead
-                        my int $p = $pos;
-                        my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_64_BIT, $endian);
-                        my int $i = -1;
-                        nqp::while(
-                            nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
-                            nqp::bindpos_n($array, $i,
-                                           nqp::readnum($cbor,
-                                                        nqp::add_i($p,
-                                                                   nqp::bitshiftl_i($i, 3)),
-                                                        $t))
-                        );
-
-                        $pos += $bytes;
-                        $array
-                    }
-                    else {
-                        die "Unable to parse native float array with element size $size";
-                    }
-                }
-                else {
-                    ... "Support decoding intarray";
-                }
-            }
-            elsif $tag-number == CBOR_Tag_Rational {
-                fail-malformed "Rational tag (30) does not contain an array with exactly two elements"
-                    unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_Array + 2;
-
-                my $nu = decode;
-                my $de = decode;
-                fail-malformed "Rational tag (30) numerator is not an integer"
-                    unless nqp::istype($nu, Int);
-                fail-malformed "Rational tag (30) denominator is not a positive integer"
-                    unless nqp::istype($de, Int) && $de > 0;
-
-                $de <= CBOR_Max_UInt_8Byte ?? Rat.new(   $nu, $de)
-                                           !! FatRat.new($nu, $de)
-            }
-            elsif $tag-number == CBOR_Tag_DateTime_Number {
-                my $seconds := decode;
-                fail-malformed "Epoch DateTime tag(1) does not contain a real number"
-                    unless nqp::istype($seconds, Real);
-                Instant.from-posix($seconds) // fail-malformed "Epoch DateTime could not be decoded"
-            }
-            elsif $tag-number == CBOR_Tag_DateTime_String {
-                my $dt := decode;
-                fail-malformed "DateTime tag (0) does not contain a string"
-                    unless nqp::istype($dt, Str);
-                DateTime.new($dt) // fail-malformed "DateTime string could not be parsed"
-            }
-            elsif $tag-number == CBOR_Tag_Unsigned_BigInt {
-                my $bytes := decode;
-                fail-malformed "Unsigned BigInt does not contain a byte string"
-                    unless nqp::istype($bytes, Buf);
-                my $value = 0;
-                $value = $value * 256 + $_ for @$bytes;
-                $value
-            }
-            elsif $tag-number == CBOR_Tag_Negative_BigInt {
-                my $bytes := decode;
-                fail-malformed "Negative BigInt does not contain a byte string"
-                    unless nqp::istype($bytes, Buf);
-                my $value = 0;
-                $value = $value * 256 + $_ for @$bytes;
-                +^$value
-            }
-            elsif $tag-number == CBOR_Tag_Decimal_Fraction {
-                fail-malformed "Decimal Fraction tag (4) does not contain an array with exactly two elements"
-                    unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_Array + 2;
-
-                my $exp = decode;
-                my $man = decode;
-                fail-malformed "Decimal Fraction tag (4) exponent is not an integer"
-                    unless nqp::istype($exp, Int);
-                fail-malformed "Decimal Fraction tag (4) mantissa is not an integer"
-                    unless nqp::istype($man, Int);
-
-                $exp >= 0 ?? $man * 10 ** $exp !! do {
-                    my $de = 10 ** -$exp;
-                    $de <= CBOR_Max_UInt_8Byte ?? Rat.new(   $man, $de)
-                                               !! FatRat.new($man, $de)
-                }
-            }
-            elsif $tag-number == CBOR_Tag_Bigfloat {
-                fail-malformed "Bigfloat tag (5) does not contain an array with exactly two elements"
-                    unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_Array + 2;
-
-                my $exp = decode;
-                my $man = decode;
-                fail-malformed "Bigfloat tag (5) exponent is not an integer"
-                    unless nqp::istype($exp, Int);
-                fail-malformed "Bigfloat tag (5) mantissa is not an integer"
-                    unless nqp::istype($man, Int);
-
-                $exp >= 0 ?? $man * 2 ** $exp !! do {
-                    my $de = 2 ** -$exp;
-                    $de <= CBOR_Max_UInt_8Byte ?? Rat.new(   $man, $de)
-                                               !! FatRat.new($man, $de)
-                }
-            }
-            # Self-tagged CBOR, just unwrap the decoded tag content
-            elsif $tag-number == CBOR_Tag_Self_Described {
-                decode
-            }
-            # XXXX: skipped tags 16..18, 21..29
-            # XXXX: Handle more special tags
-
-            else {
-                Tagged.new(:$tag-number, :value(decode))
-            }
-        }
-        else { # $major-type == CBOR_SVal
-            my constant %svals = 20 => False, 21 => True, 22 => Any, 23 => Mu;
-
-            if $argument <= CBOR_Undef {
-                $argument < CBOR_False
-                    ?? fail-malformed("Unassigned simple value $argument")
-                    !! %svals{$argument}
-            }
-            elsif $argument == CBOR_8Byte {
-                my num64 $v = $cbor.read-num64($pos, BigEndian);
-                # $pos += 8;
-                $pos = nqp::add_I(nqp::decont($pos), 8, Int);
-                $v
-            }
-            elsif $argument == CBOR_4Byte {
-                my num32 $v = $cbor.read-num32($pos, BigEndian);
-                # $pos += 4;
-                $pos = nqp::add_I(nqp::decont($pos), 8, Int);
-                $v
-            }
-            elsif $argument == CBOR_2Byte {
-                my num32 $v = num-from-bin16($cbor.read-uint16($pos, BigEndian));
-                # $pos += 2;
-                $pos = nqp::add_I(nqp::decont($pos), 8, Int);
-                $v
-            }
-            elsif $argument == CBOR_1Byte {
-                my $val  = nqp::readuint($cbor, $pos++, $ne8);
-                my $fail = $val < 24 ?? "Badly formed" !!
-                           $val < 32 ?? "Reserved"     !!
-                                        "Unassigned"   ;
-                fail-malformed "$fail simple value $val";
-            }
-            elsif $argument == CBOR_Indefinite_Break {
-                $breakable ?? Break
-                           !! fail-malformed "Unexpected break signal";
-            }
-            else {
-                fail-malformed "Badly formed simple value $argument";
-            }
-        }
+        @decoders.AT-POS(nqp::bitshiftr_i(nqp::bitand_i($initial-byte,
+                                                        CBOR_MajorType_Mask), 5)).()
     }
 
     decode;
