@@ -32,7 +32,7 @@ multi encodes-to(Mu $value, Str:D $cbor) {
 #| Unidirectional ENcoding testing, matching an expected CBOR blob
 multi encodes-to(Mu $value, Buf:D $cbor) {
     my $as-cbor = cbor-encode($value);
-    is-deeply $as-cbor, $cbor, "cbor-encode($value.raku) produces correct blob"
+    is-deeply $as-cbor, $cbor, "cbor-encode({$value.raku}) produces correct blob"
 }
 
 
