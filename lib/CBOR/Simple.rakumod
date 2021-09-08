@@ -55,6 +55,12 @@ enum CBORTagNumber (
     CBOR_Tag_Negative_BigInt  => 3,
     CBOR_Tag_Decimal_Fraction => 4,
     CBOR_Tag_Bigfloat         => 5,
+
+    #  6..15 unassigned
+    # 16..18 NYI
+    # 19..20 unassigned
+    # 21..29 NYI
+
     CBOR_Tag_Rational         => 30,
     CBOR_Tag_Absent           => 31,
     CBOR_Tag_Date_Integer     => 100,
