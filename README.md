@@ -70,6 +70,8 @@ OTHER SPECIAL CASES
 
   * CBOR's `undefined` is translated as `Mu` in Raku
 
+  * A real `Nil` in an array (which must be *bound*, not assigned) is encoded as a CBOR Absent tag (31). Absent values will be recognized on decode as well, but since array contents are *assigned* into their parent array during decoding, a `Nil` in an array will be translated to `Any` by Raku's array assignment semantics.
+
   * CBOR strings claiming to be longer than `2⁶‭³‭-1` are treated as malformed
 
   * `cbor-diagnostic()` always adds encoding indicators for float values

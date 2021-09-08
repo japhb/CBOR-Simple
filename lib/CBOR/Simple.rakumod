@@ -56,6 +56,7 @@ enum CBORTagNumber (
     CBOR_Tag_Decimal_Fraction => 4,
     CBOR_Tag_Bigfloat         => 5,
     CBOR_Tag_Rational         => 30,
+    CBOR_Tag_Absent           => 31,
     CBOR_Tag_Date_Integer     => 100,
     CBOR_Tag_Date_String      => 1004,
     CBOR_Tag_Self_Described   => 55799,
@@ -435,9 +436,16 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
         }
         # Undefined values
         else {
-            # Any:U is CBOR null, other Mu:U is CBOR undefined
-            nqp::writeuint($buf, $pos++, CBOR_SVal + (nqp::istype($value, Any)
-                                                      ?? CBOR_Null !! CBOR_Undef), $ne8);
+            if nqp::istype($_, Nil) {
+                nqp::writeuint($buf, $pos++, CBOR_Tag  + CBOR_1Byte, $ne8);
+                nqp::writeuint($buf, $pos++, CBOR_Tag_Absent,        $ne8);
+                nqp::writeuint($buf, $pos++, CBOR_SVal + CBOR_Undef, $ne8);
+            }
+            else {
+                # Any:U is CBOR null, other Mu:U is CBOR undefined
+                nqp::writeuint($buf, $pos++, CBOR_SVal + (nqp::istype($value, Any)
+                                                          ?? CBOR_Null !! CBOR_Undef), $ne8);
+            }
         }
     }
 
@@ -844,6 +852,11 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                                            !! FatRat.new($man, $de)
             }
         }
+        elsif $tag-number == CBOR_Tag_Absent {
+            fail-malformed "Absent tag (31) does not contain the undefined value"
+                unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_SVal + CBOR_Undef;
+            Nil
+        }
         # Self-tagged CBOR, just unwrap the decoded tag content
         elsif $tag-number == CBOR_Tag_Self_Described {
             decode
@@ -1161,6 +1174,12 @@ certain tag extensions improve this), so the following mappings apply:
 =item CBOR's C<null> is translated as C<Any> in Raku
 
 =item CBOR's C<undefined> is translated as C<Mu> in Raku
+
+=item A real C<Nil> in an array (which must be I<bound>, not assigned) is
+      encoded as a CBOR Absent tag (31).  Absent values will be recognized on
+      decode as well, but since array contents are I<assigned> into their
+      parent array during decoding, a C<Nil> in an array will be translated to
+      C<Any> by Raku's array assignment semantics.
 
 =item CBOR strings claiming to be longer than C<2⁶‭³‭-1> are treated as malformed
 
