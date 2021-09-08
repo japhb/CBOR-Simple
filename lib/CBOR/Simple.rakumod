@@ -1122,9 +1122,16 @@ L<RFC 8949|https://tools.ietf.org/html/rfc8949>.
 
 Currently known NOT to work:
 
-=item Encoding 16-bit floats (num16) -- decoding num16 works
+=item Encoding I<finite> 16-bit floats (num16); encoding 16-bit NaN and ±Inf,
+      as well as decoding any num16 all work.  This is a performance tradeoff
+      rather than a technical limitation; detecting whether a finite num32 can
+      be shrunk to 16 bits without losing information is costly and rarely
+      results in space savings except in trivial cases (e.g. Nums containing
+      only small integers).
 
-=item Special decoding for registered tags other than numbers 0..5, 30, and 55799
+=item Special decoding for registered tags I<other than> numbers 0..5, 30, 100,
+      1004, and 55799.  The rest are NYI (Not Yet Implemented), but many will
+      be added over time in future releases.
 
 
 =head2 DATE, DATETIME, INSTANT
