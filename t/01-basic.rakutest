@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 88;
+plan 92;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -141,6 +141,13 @@ decodes-to DateTime.new("2013-03-21T20:04:00Z"),
            'c074323031332d30332d32315432303a30343a30305a';
 matches Instant.from-posix(1363896240),   'c11a514b67b0';
 matches Instant.from-posix(1363896240.5), 'c1fb41d452d9ec200000';
+
+# RFC 8943 date extension tests adapted from
+# https://www.rfc-editor.org/rfc/rfc8943.html#name-example-date-representation
+matches    Date.new('1940-10-09'), 'd8643929b3';
+matches    Date.new('1980-12-08'), 'd864190f9a';
+decodes-to Date.new('1940-10-09'), 'd903ec6a313934302d31302d3039';
+decodes-to Date.new('1980-12-08'), 'd903ec6a313938302d31322d3038';
 
 # Decimal Fraction/Bigfloat tests from https://tools.ietf.org/html/rfc8949#section-3.4.4
 decodes-to 273.15, 'c48221196ab3';

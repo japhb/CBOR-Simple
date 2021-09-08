@@ -42,18 +42,26 @@ Currently known NOT to work:
 
   * Special decoding for registered tags other than numbers 0..5, 30, and 55799
 
-DATETIME AND INSTANT
---------------------
+DATE, DATETIME, INSTANT
+-----------------------
 
-Raku's builtin time handling is richer than the default CBOR data model, so the following mappings apply:
+Raku's builtin time handling is richer than the default CBOR data model (though certain tag extensions improve this), so the following mappings apply:
 
-  * `Instant` and `DateTime` are both written as tag 1 (epoch-based date/time)
+  * Encoding
 
-  * Other `Dateish` are written as tag 0 (date/time string)
+    * `Instant` and `DateTime` are both written as tag 1 (epoch-based date/time)
 
-  * Tag 0 (date/time string) is parsed as `DateTime`
+    * Other `Dateish` are written as tag 100 (RFC 8943 days since 1970-01-01)
 
-  * Tag 1 (epoch-based date/time) is parsed via `Instant.from-posix()`
+  * Decoding
+
+    * Tag 0 (date/time string) is parsed as a `DateTime`
+
+    * Tag 1 (epoch-based date/time) is parsed via `Instant.from-posix()`
+
+    * Tag 100 (days since 1970-01-01) is parsed via `Date.new-from-daycount()`
+
+    * Tag 1004 (date string) is parsed as a `Date`
 
 OTHER SPECIAL CASES
 -------------------

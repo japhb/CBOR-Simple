@@ -56,6 +56,8 @@ enum CBORTagNumber (
     CBOR_Tag_Decimal_Fraction => 4,
     CBOR_Tag_Bigfloat         => 5,
     CBOR_Tag_Rational         => 30,
+    CBOR_Tag_Date_Integer     => 100,
+    CBOR_Tag_Date_String      => 1004,
     CBOR_Tag_Self_Described   => 55799,
 );
 
@@ -421,8 +423,9 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     encode($val);
                 }
                 else {
-                    nqp::writeuint($buf, $pos++, CBOR_Tag + CBOR_Tag_DateTime_String, $ne8);
-                    encode(.yyyy-mm-dd);
+                    nqp::writeuint($buf, $pos++, CBOR_Tag + CBOR_1Byte, $ne8);
+                    nqp::writeuint($buf, $pos++, CBOR_Tag_Date_Integer, $ne8);
+                    encode(.daycount - 40587);  # Raku MJD -> RFC 8943 days
                 }
             }
             else {
@@ -779,6 +782,18 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 unless nqp::istype($dt, Str);
             DateTime.new($dt) // fail-malformed "DateTime string could not be parsed"
         }
+        elsif $tag-number == CBOR_Tag_Date_Integer {
+            my $days := decode;
+            fail-malformed "Gregorian days tag(100) does not contain an integer"
+                unless nqp::istype($days, Int);
+            Date.new-from-daycount($days + 40587) // fail-malformed "Gregorian days could not be decoded"
+        }
+        elsif $tag-number == CBOR_Tag_Date_String {
+            my $date := decode;
+            fail-malformed "Date string tag (1004) does not contain a string"
+                unless nqp::istype($date, Str);
+            Date.new($date) // fail-malformed "Date string could not be parsed"
+        }
         elsif $tag-number == CBOR_Tag_Unsigned_BigInt {
             my $bytes := decode;
             fail-malformed "Unsigned BigInt does not contain a byte string"
@@ -1112,18 +1127,26 @@ Currently known NOT to work:
 =item Special decoding for registered tags other than numbers 0..5, 30, and 55799
 
 
-=head2 DATETIME AND INSTANT
+=head2 DATE, DATETIME, INSTANT
 
-Raku's builtin time handling is richer than the default CBOR data model, so the
-following mappings apply:
+Raku's builtin time handling is richer than the default CBOR data model (though
+certain tag extensions improve this), so the following mappings apply:
 
-=item C<Instant> and C<DateTime> are both written as tag 1 (epoch-based date/time)
+=item1 Encoding
 
-=item Other C<Dateish> are written as tag 0 (date/time string)
+=item2 C<Instant> and C<DateTime> are both written as tag 1 (epoch-based date/time)
 
-=item Tag 0 (date/time string) is parsed as C<DateTime>
+=item2 Other C<Dateish> are written as tag 100 (RFC 8943 days since 1970-01-01)
 
-=item Tag 1 (epoch-based date/time) is parsed via C<Instant.from-posix()>
+=item1 Decoding
+
+=item2 Tag 0 (date/time string) is parsed as a C<DateTime>
+
+=item2 Tag 1 (epoch-based date/time) is parsed via C<Instant.from-posix()>
+
+=item2 Tag 100 (days since 1970-01-01) is parsed via C<Date.new-from-daycount()>
+
+=item2 Tag 1004 (date string) is parsed as a C<Date>
 
 
 =head2 OTHER SPECIAL CASES
