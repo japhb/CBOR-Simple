@@ -435,6 +435,10 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     encode(.daycount - 40587);  # Raku MJD -> RFC 8943 days
                 }
             }
+            elsif nqp::istype($_, Tagged) {
+                write-uint(CBOR_Tag, .tag-number);
+                encode(.value);
+            }
             else {
                 my $ex = "Don't know how to encode a {$value.^name}";
                 $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
@@ -867,9 +871,7 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         elsif $tag-number == CBOR_Tag_Self_Described {
             decode
         }
-        # XXXX: skipped tags 16..18, 21..29
-        # XXXX: Handle more special tags
-
+        # Final fallback: Just wrapped the value in a CBOR::Simple::Tagged object
         else {
             Tagged.new(:$tag-number, :value(decode))
         }
@@ -1126,6 +1128,10 @@ my $bad  = cbor-decode(buf8.new(0x81 xx 3));  # BOOM!
 
 # Decode CBOR into diagnostic text, used for checking encodings and complex structures
 my $diag = cbor-diagnostic($cbor);
+
+# Force the encoder to tag a value with a particular tag number
+my $tagged = CBOR::Simple::Tagged.new(:$tag-number, :$value);
+my $cbor   = cbor-encode($tagged);
 
 =end code
 

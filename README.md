@@ -26,6 +26,10 @@ my $bad  = cbor-decode(buf8.new(0x81 xx 3));  # BOOM!
 
 # Decode CBOR into diagnostic text, used for checking encodings and complex structures
 my $diag = cbor-diagnostic($cbor);
+
+# Force the encoder to tag a value with a particular tag number
+my $tagged = CBOR::Simple::Tagged.new(:$tag-number, :$value);
+my $cbor   = cbor-encode($tagged);
 ```
 
 DESCRIPTION
