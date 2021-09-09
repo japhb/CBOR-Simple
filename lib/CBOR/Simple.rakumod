@@ -1181,6 +1181,25 @@ Currently known NOT to work:
       be added over time in future releases.
 
 
+=head2 TAG CONTENT STRICTNESS
+
+When encoding, C<CBOR::Simple> makes every attempt to encode tagged content
+strictly within the tag standards as written, always producing spec-compliant
+encoded values.
+
+When decoding, C<CBOR::Simple> will often slightly relax the allowed content
+types in tagged content, especially when later tag proposals made no change
+other than to extend the allowed content types and allocate a new tag number
+for that.  In the extension case C<CBOR::Simple> is likely to allow both the
+old and new tag to accept the same content domain when decoding.
+
+For example, when encoding C<CBOR::Simple> will always encode C<Instant> or
+C<DateTime> as a CBOR epoch-based date/time (tag 1), using standard integer
+or floating point content data.  But when I<decoding>, C<CBOR::Simple> will
+accept any content that decodes properly as a Raku C<Real> value -- and in
+particular will handle a CBOR Rational (tag 30) as another valid content type.
+
+
 =head2 DATE, DATETIME, INSTANT
 
 Raku's builtin time handling is richer than the default CBOR data model (though

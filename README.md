@@ -46,6 +46,15 @@ Currently known NOT to work:
 
   * Special decoding for registered tags *other than* numbers 0..5, 30, 100, 1004, and 55799. The rest are NYI (Not Yet Implemented), but many will be added over time in future releases.
 
+TAG CONTENT STRICTNESS
+----------------------
+
+When encoding, `CBOR::Simple` makes every attempt to encode tagged content strictly within the tag standards as written, always producing spec-compliant encoded values.
+
+When decoding, `CBOR::Simple` will often slightly relax the allowed content types in tagged content, especially when later tag proposals made no change other than to extend the allowed content types and allocate a new tag number for that. In the extension case `CBOR::Simple` is likely to allow both the old and new tag to accept the same content domain when decoding.
+
+For example, when encoding `CBOR::Simple` will always encode `Instant` or `DateTime` as a CBOR epoch-based date/time (tag 1), using standard integer or floating point content data. But when *decoding*, `CBOR::Simple` will accept any content that decodes properly as a Raku `Real` value -- and in particular will handle a CBOR Rational (tag 30) as another valid content type.
+
 DATE, DATETIME, INSTANT
 -----------------------
 
