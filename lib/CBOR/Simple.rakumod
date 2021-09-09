@@ -1166,32 +1166,37 @@ certain tag extensions improve this), so the following mappings apply:
 
 =item1 Encoding
 
-=item2 C<Instant> and C<DateTime> are both written as tag 1 (epoch-based date/time)
+=item2 C<Instant> and C<DateTime> are both written as tag 1 (epoch-based
+       date/time) with integer (if lossless) or floating point content.
 
-=item2 Other C<Dateish> are written as tag 100 (RFC 8943 days since 1970-01-01)
+=item2 Other C<Dateish> are written as tag 100 (RFC 8943 days since 1970-01-01).
 
 =item1 Decoding
 
-=item2 Tag 0 (date/time string) is parsed as a C<DateTime>
+=item2 Tag 0 (date/time string) is parsed as a C<DateTime>.
 
-=item2 Tag 1 (epoch-based date/time) is parsed via C<Instant.from-posix()>
+=item2 Tag 1 (epoch-based date/time) is parsed via C<Instant.from-posix()>, and
+       handles any Real type in the tag content.
 
-=item2 Tag 100 (days since 1970-01-01) is parsed via C<Date.new-from-daycount()>
+=item2 Tag 100 (days since 1970-01-01) is parsed via C<Date.new-from-daycount()>.
 
-=item2 Tag 1004 (date string) is parsed as a C<Date>
+=item2 Tag 1004 (date string) is parsed as a C<Date>.
 
 
-=head2 OTHER SPECIAL CASES
+=head2 UNDEFINED VALUES
 
-=item CBOR's C<null> is translated as C<Any> in Raku
+=item CBOR's C<null> is translated as C<Any> in Raku.
 
-=item CBOR's C<undefined> is translated as C<Mu> in Raku
+=item CBOR's C<undefined> is translated as C<Mu> in Raku.
 
 =item A real C<Nil> in an array (which must be I<bound>, not assigned) is
       encoded as a CBOR Absent tag (31).  Absent values will be recognized on
       decode as well, but since array contents are I<assigned> into their
       parent array during decoding, a C<Nil> in an array will be translated to
       C<Any> by Raku's array assignment semantics.
+
+
+=head2 OTHER SPECIAL CASES
 
 =item CBOR strings claiming to be longer than C<2⁶‭³‭-1> are treated as malformed
 

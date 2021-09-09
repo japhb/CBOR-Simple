@@ -53,28 +53,32 @@ Raku's builtin time handling is richer than the default CBOR data model (though 
 
   * Encoding
 
-    * `Instant` and `DateTime` are both written as tag 1 (epoch-based date/time)
+    * `Instant` and `DateTime` are both written as tag 1 (epoch-based date/time) with integer (if lossless) or floating point content.
 
-    * Other `Dateish` are written as tag 100 (RFC 8943 days since 1970-01-01)
+    * Other `Dateish` are written as tag 100 (RFC 8943 days since 1970-01-01).
 
   * Decoding
 
-    * Tag 0 (date/time string) is parsed as a `DateTime`
+    * Tag 0 (date/time string) is parsed as a `DateTime`.
 
-    * Tag 1 (epoch-based date/time) is parsed via `Instant.from-posix()`
+    * Tag 1 (epoch-based date/time) is parsed via `Instant.from-posix()`, and handles any Real type in the tag content.
 
-    * Tag 100 (days since 1970-01-01) is parsed via `Date.new-from-daycount()`
+    * Tag 100 (days since 1970-01-01) is parsed via `Date.new-from-daycount()`.
 
-    * Tag 1004 (date string) is parsed as a `Date`
+    * Tag 1004 (date string) is parsed as a `Date`.
+
+UNDEFINED VALUES
+----------------
+
+  * CBOR's `null` is translated as `Any` in Raku.
+
+  * CBOR's `undefined` is translated as `Mu` in Raku.
+
+  * A real `Nil` in an array (which must be *bound*, not assigned) is encoded as a CBOR Absent tag (31). Absent values will be recognized on decode as well, but since array contents are *assigned* into their parent array during decoding, a `Nil` in an array will be translated to `Any` by Raku's array assignment semantics.
 
 OTHER SPECIAL CASES
 -------------------
 
-  * CBOR's `null` is translated as `Any` in Raku
-
-  * CBOR's `undefined` is translated as `Mu` in Raku
-
-  * A real `Nil` in an array (which must be *bound*, not assigned) is encoded as a CBOR Absent tag (31). Absent values will be recognized on decode as well, but since array contents are *assigned* into their parent array during decoding, a `Nil` in an array will be translated to `Any` by Raku's array assignment semantics.
 
   * CBOR strings claiming to be longer than `2⁶‭³‭-1` are treated as malformed
 
