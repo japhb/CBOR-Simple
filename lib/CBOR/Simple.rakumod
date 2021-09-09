@@ -1165,6 +1165,118 @@ L<CBOR serialization format|https://cbor.io/>, implementing the standard as of
 L<RFC 8949|https://tools.ietf.org/html/rfc8949>.
 
 
+=head2 TAG IMPLEMENTATION STATUS
+
+Note that unrecognized tags will decode to their contents wrapped with a
+C<CBOR::Simple::Tagged> object that records its C<tag-number>; check marks in
+the following table indicate conversion to/from an appropriate native Raku type
+rather than this default behavior:
+
+=begin table :caption<Tag Status Overview>
+    GROUP          | SUPPORT | NOTES
+    ============== |=========|======
+    Core           | Good    | Core RFC 8949 CBOR data model and syntax
+    Encodings      | NONE    | baseN, MIME, YANG, BER, non-utf8 strings
+    Geo            | NONE    | Geographic coordinates and shapes
+    Graph          | NONE    | Cyclic, indirected, and self-referential structures
+    Identifiers    | NONE    | UUID, IPLD CID, general identifiers
+    Networking     | NONE    | IPv4/IPv6 addresses, subnets, and masks
+    Numbers        | Good    | Full Rational and BigInt/Float support
+    Packed Arrays  | Partial | Packed num16, num32, and num64 arrays supported
+    Security       | NONE    | COSE and CWT
+    Special Arrays | NONE    | Explicit multi-dimensional or homogenous arrays
+    Specialty      | NONE    | IoT data, Openswan, PlatformV, RAINS
+    String Hints   | NONE    | JSON conversions, language tags, URIs, Regex
+    Tag Fallbacks  | Good    | Round tripping of unknown tagged content
+    Date/Time      | Partial | All but tagged time (tags 1001-1003) supported
+=end table
+
+=begin table :caption<Tag Status Details>
+    SPEC         |      TAGS | ENCODE | DECODE | NOTES
+    =============|===========|========|========|===================================
+    RFC 8949     |         0 | →      | ✓      | → Encoded as tag 1
+    RFC 8949     |         1 | ✓      | ✓      | DateTime/Instant
+    RFC 8949     |       2,3 | ✓      | ✓      | (Big) Int
+    RFC 8949     |       4,5 | →      | ✓      | → Encoded as tag 30
+    unassigned   |      6-15 |        |        |
+    COSE         |     16-18 | ✘      | ✘      | MAC/Signatures
+    unassigned   |     19-20 |        |        |
+    RFC 8949     |     21-23 | ✘      | ✘      | Expected JSON conversion to baseN
+    RFC 8949     |        24 | *      | ✓      | Encoded CBOR data item
+    [Lehmann]    |        25 | ✘      | ✘      | String backrefs
+    [Lehmann]    |     26,27 | ✘      | ✘      | General serialized objects
+    [Lehmann]    |     28,29 | ✘      | ✘      | Shareable referenced values
+    [Occil]      |        30 | ✓      | ✓      | Rational numbers
+    [Vaarala]    |        31 | ✓      | *      | Absent values
+    RFC 8949     |     32-34 | ✘      | ✘      | URIs and base64 encoding
+    RFC 7094     |        35 | D      | D      | PCRE/ECMA 262 regex (DEPRECATED)
+    RFC 8949     |        36 | ✘      | ✘      | Text-based MIME messages
+    [Clemente]   |        37 | ✘      | ✘      | Binary UUID
+    [Occil]      |        38 | ✘      | ✘      | Language-tagged string
+    [Clemente]   |        39 | ✘      | ✘      | Identifier semantics
+    RFC 8746     |        40 | ✘      | ✘      | Row-major multidim array
+    RFC 8746     |        41 | ✘      | ✘      | Homogenous array
+    [Mische]     |        42 | ✘      | ✘      | IPLD content identifier
+    [YANG]       |     43-47 | ✘      | ✘      | YANG datatypes
+    unassigned   |     48-51 |        |        |
+    draft        |        52 | D      | D      | IPv4 address/network (DEPRECATED)
+    unassigned   |        53 |        |        |
+    draft        |        54 | D      | D      | IPv6 address/network (DEPRECATED)
+    unassigned   |     55-60 |        |        |
+    RFC 8392     |        61 | ✘      | ✘      | CBOR Web Token (CWT)
+    unassigned   |        62 |        |        |
+    [Bormann]    |        63 | ✓      | ✓      | Encoded CBOR Sequence
+    RFC 8746     |     64-79 | ✘!     | ✘!     | Packed int arrays
+    RFC 8746     |     80-87 | ✓      | ✓      | Packed num arrays (except 128-bit)
+    unassigned   |     88-95 |        |        |
+    COSE         |     96-98 | ✘      | ✘      | Encryption/MAC/Signatures
+    unassigned   |        99 |        |        |
+    RFC 8943     |       100 | ✓      | ✓      | Date
+    unassigned   |   101-102 |        |        |
+    [Vidovic]    |       103 | ✘      | ✘      | Geo coords
+    [Clarke]     |       104 | ✘      | ✘      | Geo coords ref system WKT/EPSG
+    unassigned   |   105-109 |        |        |
+    RFC 9090     |   110-112 | ✘      | ✘      | BER-encoded object ID
+    unassigned   |   113-119 |        |        |
+    [Vidovic]    |       120 | ✘      | ✘      | IoT data point
+    unassigned   |   121-255 |        |        |
+    XXXX: WIP    | ... | | |
+    unassigned   |  279-1000 |        |        |
+    [Bormann]    | 1001-1003 | ✘      | ✘      | Extended time representations
+    RFC 8943     |      1004 | →      | ✓      | → Encoded as tag 100
+    unassigned   | 1005-1039 |        |        |
+    RFC 8746     |      1040 | ✘      | ✘      | Column-major multidim array
+    unassigned   |1041-22097 |        |        |
+    [Lehmann]    |     22098 | ✘      | ✘      | Hint for additional indirection
+    unassigned   |22099-49999|        |        |
+    [Tongzhou]   |50000-50011| ✘      | ✘      | PlatformV
+    unassigned   |50012-55798|        |        |
+    RFC 8949     |     55799 | ✓      | ✓      | Self-described CBOR
+    [Richardson] |     55800 | ✘!     | ✘!     | Self-described CBOR Sequence
+    unassigned   |55801-65534|        |        |
+    invalid      |     65535 |        | ✓      | Invalid tag detected
+    unassigned   |65536-15309735|     |        |
+    [Trammell]   |  15309736 | ✘      | ✘      | RAINS message
+    unassigned   |15309737-1330664269| |       |
+    [Hussain]    |1330664270 | ✘      | ✘      | CBOR-encoded Openswan config file
+    unassigned   |1330664271-4294967294| |     |
+    invalid      |4294967295 |        | ✓      | Invalid tag detected
+    unassigned   | ...       |        |        |
+    invalid      |18446744073709551615| | ✓    | Invalid tag detected
+=end table
+
+=begin table :caption<Tag Table Symbol Key>
+    SYMBOL | MEANING
+    =======|========
+    ✓      | Fully supported
+    *      | Supported, but see notes below
+    →      | Raku values will be encoded using a different tag
+    D      | Deprecated and unsupported tag spec; may eventually be decodable
+    ✘      | Not yet implemented
+    ✘!     | Not yet implemented, but already requested
+=end table
+
+
 =head2 NYI
 
 Currently known NOT to work:
