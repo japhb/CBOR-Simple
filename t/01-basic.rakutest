@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 94;
+plan 95;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -152,6 +152,11 @@ decodes-to Date.new('1980-12-08'), 'd903ec6a313938302d31322d3038';
 # Decimal Fraction/Bigfloat tests from https://tools.ietf.org/html/rfc8949#section-3.4.4
 decodes-to 273.15, 'c48221196ab3';
 decodes-to   1.5,  'c582203';
+
+# Tag 24: Lazily-decoded CBOR data item
+my $value = cbor-encode(42);
+my $lazy  = CBOR::Simple::Tagged.new(:tag-number(24), :$value);
+matches $lazy, 'd81842182a';
 
 # Extension tag 30: Rational number
 # First test from http://peteroupc.github.io/CBOR/rational.html, the rest by me

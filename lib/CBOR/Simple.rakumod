@@ -59,7 +59,11 @@ enum CBORTagNumber (
     #  6..15 unassigned
     # 16..18 NYI
     # 19..20 unassigned
-    # 21..29 NYI
+    # 21..23 NYI
+
+    CBOR_Tag_Encoded_CBOR     => 24,
+
+    # 25..29 NYI
 
     CBOR_Tag_Rational         => 30,
     CBOR_Tag_Absent           => 31,
@@ -867,6 +871,12 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_SVal + CBOR_Undef;
             Nil
         }
+        # Lazy decoding: byte string containing CBOR-encoded data that is NOT unwrapped
+        elsif $tag-number == CBOR_Tag_Encoded_CBOR {
+            fail-malformed "Encoded CBOR tag (24) does not contain a byte string"
+                unless nqp::readuint($cbor, $pos, $ne8) +& CBOR_MajorType_Mask == CBOR_BStr;
+            Tagged.new(:$tag-number, :value(decode))
+        }
         # Self-tagged CBOR, just unwrap the decoded tag content
         elsif $tag-number == CBOR_Tag_Self_Described {
             decode
@@ -1197,6 +1207,10 @@ certain tag extensions improve this), so the following mappings apply:
 
 
 =head2 OTHER SPECIAL CASES
+
+=item To mark a substructure for lazy decoding (treating it as an opaque
+      C<Blob> until explicitly decoded), use the tagged value idiom in the
+      SYNOPSIS with `:tag-number(24)` (encoded CBOR value).
 
 =item CBOR strings claiming to be longer than C<2⁶‭³‭-1> are treated as malformed
 

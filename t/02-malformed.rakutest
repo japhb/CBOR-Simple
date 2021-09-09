@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 94;
+plan 101;
 
 
 # Failure can get "hidden" deep inside decoded structures, so fatalize instead
@@ -67,6 +67,12 @@ malformed($_, "Break in an indefinite-length map that would lead to an odd numbe
 
 malformed($_, "Major type 0, 1, 6 with additional information 31") for
     < 1f 3f df >;
+
+
+# TAG CONTENT REQUIREMENTS
+
+malformed($_, "Tag 24 requires byte string content") for
+    < d8180a d8182a d8186141 d818820102 d818a0 d818d8184103 d818f7 >;
 
 
 done-testing;
