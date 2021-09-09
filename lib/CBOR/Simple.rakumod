@@ -62,6 +62,7 @@ enum CBORTagNumber (
     # 21..23 NYI
 
     CBOR_Tag_Encoded_CBOR     => 24,
+    CBOR_Tag_Encoded_Sequence => 63,
 
     # 25..29 NYI
 
@@ -876,8 +877,9 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             Nil
         }
         # Lazy decoding: byte string containing CBOR-encoded data that is NOT unwrapped
-        elsif $tag-number == CBOR_Tag_Encoded_CBOR {
-            fail-malformed "Encoded CBOR tag (24) does not contain a byte string"
+        elsif $tag-number == CBOR_Tag_Encoded_CBOR
+           || $tag-number == CBOR_Tag_Encoded_Sequence {
+            fail-malformed "Encoded CBOR tag ($tag-number) does not contain a byte string"
                 unless nqp::readuint($cbor, $pos, $ne8) +& CBOR_MajorType_Mask == CBOR_BStr;
             Tagged.new(:$tag-number, :value(decode))
         }

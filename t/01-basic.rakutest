@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 95;
+plan 96;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -153,10 +153,12 @@ decodes-to Date.new('1980-12-08'), 'd903ec6a313938302d31322d3038';
 decodes-to 273.15, 'c48221196ab3';
 decodes-to   1.5,  'c582203';
 
-# Tag 24: Lazily-decoded CBOR data item
+# Tag 24/63: Lazily-decoded CBOR data item/Sequence
 my $value = cbor-encode(42);
 my $lazy  = CBOR::Simple::Tagged.new(:tag-number(24), :$value);
+my $seq   = CBOR::Simple::Tagged.new(:tag-number(63), :$value);
 matches $lazy, 'd81842182a';
+matches $seq,  'd83f42182a';
 
 # Extension tag 30: Rational number
 # First test from http://peteroupc.github.io/CBOR/rational.html, the rest by me
