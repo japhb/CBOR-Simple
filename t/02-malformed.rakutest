@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 101;
+plan 104;
 
 
 # Failure can get "hidden" deep inside decoded structures, so fatalize instead
@@ -69,7 +69,10 @@ malformed($_, "Major type 0, 1, 6 with additional information 31") for
     < 1f 3f df >;
 
 
-# TAG CONTENT REQUIREMENTS
+# TAG FORMAT AND CONTENT REQUIREMENTS
+
+malformed($_, "All-ones multibyte tag numbers invalid") for
+    < d9ffff00 daffffffff01 dbffffffffffffffff02 >;
 
 malformed($_, "Tag 24 requires byte string content") for
     < d8180a d8182a d8186141 d818820102 d818a0 d818d8184103 d818f7 >;

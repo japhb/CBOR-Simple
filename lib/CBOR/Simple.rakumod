@@ -70,6 +70,10 @@ enum CBORTagNumber (
     CBOR_Tag_Date_Integer     => 100,
     CBOR_Tag_Date_String      => 1004,
     CBOR_Tag_Self_Described   => 55799,
+
+    CBOR_Tag_Invalid_2Byte    => 65535,
+    CBOR_Tag_Invalid_4Byte    => 4294967295,
+    CBOR_Tag_Invalid_8Byte    => 18446744073709551615,
 );
 
 
@@ -880,6 +884,12 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
         # Self-tagged CBOR, just unwrap the decoded tag content
         elsif $tag-number == CBOR_Tag_Self_Described {
             decode
+        }
+        # Intentionally (as per spec) invalid tag values
+        elsif $tag-number == CBOR_Tag_Invalid_2Byte
+           || $tag-number == CBOR_Tag_Invalid_4Byte
+           || $tag-number == CBOR_Tag_Invalid_8Byte {
+            fail-malformed "Multi-byte tag number has all bits on";
         }
         # Final fallback: Just wrapped the value in a CBOR::Simple::Tagged object
         else {
