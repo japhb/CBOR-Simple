@@ -77,9 +77,11 @@ NYI
 
 Currently known NOT to work:
 
-  * Encoding *finite* 16-bit floats (num16); encoding 16-bit NaN and ±Inf, as well as decoding any num16 all work. This is a performance tradeoff rather than a technical limitation; detecting whether a finite num32 can be shrunk to 16 bits without losing information is costly and rarely results in space savings except in trivial cases (e.g. Nums containing only small integers).
+  * Any tag marked '✘' (valid but not yet supported) or 'D' (deprecated spec) in the ENCODE or DECODE column of the Tag Status Details table, or any tag not explicitly listed therein, will be treated as an opaque tagged value rather than treated as a native type.
 
-  * Special decoding for registered tags *other than* numbers 0..5, 30, 100, 1004, and 55799. The rest are NYI (Not Yet Implemented), but many will be added over time in future releases.
+  * Packed arrays of 128-bit floats (num128); these are not supported in Rakudo yet.
+
+  * Encoding *finite* 16-bit floats (num16); encoding 16-bit NaN and ±Inf, as well as decoding any num16 all work. This is a performance tradeoff rather than a technical limitation; detecting whether a finite num32 can be shrunk to 16 bits without losing information is costly and rarely results in space savings except in trivial cases (e.g. Nums containing only small integers).
 
 TAG CONTENT STRICTNESS
 ----------------------
