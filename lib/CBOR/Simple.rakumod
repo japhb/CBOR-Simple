@@ -1169,8 +1169,8 @@ L<RFC 8949|https://tools.ietf.org/html/rfc8949>.
 
 Note that unrecognized tags will decode to their contents wrapped with a
 C<CBOR::Simple::Tagged> object that records its C<tag-number>; check marks in
-the following table indicate conversion to/from an appropriate native Raku type
-rather than this default behavior:
+the details table indicate conversion to/from an appropriate native Raku type
+rather than this default behavior.
 
 =begin table :caption<Tag Status Overview>
     GROUP          | SUPPORT | NOTES

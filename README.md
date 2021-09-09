@@ -40,7 +40,7 @@ CBOR::Simple is a trivial implementation of the core functionality of the [CBOR 
 TAG IMPLEMENTATION STATUS
 -------------------------
 
-Note that unrecognized tags will decode to their contents wrapped with a `CBOR::Simple::Tagged` object that records its `tag-number`; check marks in the following table indicate conversion to/from an appropriate native Raku type rather than this default behavior:
+Note that unrecognized tags will decode to their contents wrapped with a `CBOR::Simple::Tagged` object that records its `tag-number`; check marks in the details table indicate conversion to/from an appropriate native Raku type rather than this default behavior.
 
 <table class="pod-table">
 <caption>Tag Status Overview</caption>
