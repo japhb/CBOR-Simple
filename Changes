@@ -1,5 +1,38 @@
 Revision history for CBOR-Simple
 
+0.1.0  *WIP*
+  [Breaking Changes]
+  - Date objects (*not* DateTime) are now properly serialized as tag 100,
+    instead of serializing them as a DateTime with zeroed time components
+
+  [Docs]
+  - Vastly expanded Pod/README docs, with several new sections
+  - Support status details for every CBOR tag known to IANA
+
+  [Tags]
+  - Detection of invalid tag numbers
+  - Support manual tag wrapping using CBOR::Simple::Tagged wrapper objects
+  - Support delayed/lazy-decoding tags
+    *    24: encoded CBOR value
+    *    63: encoded CBOR Sequence
+  - Support for several other new tags
+    *    31: absent value
+    *   100: Date expressed as days since epoch
+    *   258: Set
+    *   259: Map with object keys
+    *   264: Decimal fraction with arbitrary exponent
+    *   265: Bigfloat with arbitrary exponent
+    *   275: Map with only string keys
+    *  1004: Date expressed as yyyy-mm-dd string
+    * 55800: Self-described CBOR Sequence
+
+  [Tests]
+  - Refactored common code
+  - Improved encodes-to descriptions
+  - Added malformed tests section for tag syntax/content requirements
+  - Dropped perf-test script in favor of pointing users to serializer-perf
+
+
 0.0.9  2021-06-07
   - Lots of small-to-medium performance improvements for *non-packed* data
   - Encode ±Inf and NaN as 16 bit floats if possible
