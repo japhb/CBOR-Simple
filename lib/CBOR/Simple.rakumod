@@ -50,32 +50,32 @@ enum CBORMinMax (
 
 
 enum CBORTagNumber (
-    CBOR_Tag_DateTime_String  => 0,
-    CBOR_Tag_DateTime_Number  => 1,
-    CBOR_Tag_Unsigned_BigInt  => 2,
-    CBOR_Tag_Negative_BigInt  => 3,
-    CBOR_Tag_Decimal_Fraction => 4,
-    CBOR_Tag_Bigfloat         => 5,
+    CBOR_Tag_DateTime_String   => 0,
+    CBOR_Tag_DateTime_Number   => 1,
+    CBOR_Tag_Unsigned_BigInt   => 2,
+    CBOR_Tag_Negative_BigInt   => 3,
+    CBOR_Tag_Decimal_Fraction  => 4,
+    CBOR_Tag_Bigfloat          => 5,
 
     #  6..15 unassigned
     # 16..18 NYI
     # 19..20 unassigned
     # 21..23 NYI
 
-    CBOR_Tag_Encoded_CBOR     => 24,
-    CBOR_Tag_Encoded_Sequence => 63,
+    CBOR_Tag_Encoded_CBOR      => 24,
+    CBOR_Tag_Encoded_Sequence  => 63,
 
     # 25..29 NYI
 
-    CBOR_Tag_Rational         => 30,
-    CBOR_Tag_Absent           => 31,
-    CBOR_Tag_Date_Integer     => 100,
-    CBOR_Tag_Date_String      => 1004,
-    CBOR_Tag_Self_Described   => 55799,
+    CBOR_Tag_Rational          => 30,
+    CBOR_Tag_Absent            => 31,
+    CBOR_Tag_Date_Integer      => 100,
+    CBOR_Tag_Date_String       => 1004,
+    CBOR_Tag_Self_Described    => 55799,
 
-    CBOR_Tag_Invalid_2Byte    => 65535,
-    CBOR_Tag_Invalid_4Byte    => 4294967295,
-    CBOR_Tag_Invalid_8Byte    => 18446744073709551615,
+    CBOR_Tag_Invalid_2Byte     => 65535,
+    CBOR_Tag_Invalid_4Byte     => 4294967295,
+    CBOR_Tag_Invalid_8Byte     => 18446744073709551615,
 );
 
 
