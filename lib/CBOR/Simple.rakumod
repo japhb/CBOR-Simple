@@ -85,6 +85,9 @@ enum CBORTagNumber (
     # 99     unassigned
 
     CBOR_Tag_Date_Integer      => 100,
+
+    CBOR_Tag_Decimal_Extended  => 264,
+    CBOR_Tag_Bigfloat_Extended => 265,
     CBOR_Tag_Date_String       => 1004,
     CBOR_Tag_Self_Described    => 55799,
 
@@ -853,8 +856,9 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             $value = $value * 256 + $_ for @$bytes;
             +^$value
         }
-        elsif $tag-number == CBOR_Tag_Decimal_Fraction {
-            fail-malformed "Decimal Fraction tag (4) does not contain an array with exactly two elements"
+        elsif $tag-number == CBOR_Tag_Decimal_Fraction
+           || $tag-number == CBOR_Tag_Decimal_Extended {
+            fail-malformed "Decimal Fraction tag ($tag-number) does not contain an array with exactly two elements"
                 unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_Array + 2;
 
             my $exp = decode;
@@ -870,8 +874,9 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                                            !! FatRat.new($man, $de)
             }
         }
-        elsif $tag-number == CBOR_Tag_Bigfloat {
-            fail-malformed "Bigfloat tag (5) does not contain an array with exactly two elements"
+        elsif $tag-number == CBOR_Tag_Bigfloat
+           || $tag-number == CBOR_Tag_Bigfloat_Extended {
+            fail-malformed "Bigfloat tag ($tag-number) does not contain an array with exactly two elements"
                 unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_Array + 2;
 
             my $exp = decode;
@@ -1376,6 +1381,9 @@ certain tag extensions improve this), so the following mappings apply:
       SYNOPSIS with `:tag-number(24)` (encoded CBOR value).
 
 =item CBOR strings claiming to be longer than C<2⁶‭³‭-1> are treated as malformed.
+
+=item Bigfloats and decimal fractions (tags 4, 5, 264, 265) with very large
+      exponents may result in numeric overflow when decoded.
 
 =item C<cbor-diagnostic()> always adds encoding indicators for float values.
 

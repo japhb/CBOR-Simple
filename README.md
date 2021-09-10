@@ -129,6 +129,8 @@ OTHER SPECIAL CASES
 
   * CBOR strings claiming to be longer than `2⁶‭³‭-1` are treated as malformed.
 
+  * Bigfloats and decimal fractions (tags 4, 5, 264, 265) with very large exponents may result in numeric overflow when decoded.
+
   * `cbor-diagnostic()` always adds encoding indicators for float values.
 
 AUTHOR
