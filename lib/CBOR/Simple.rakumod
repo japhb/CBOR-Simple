@@ -1209,17 +1209,17 @@ rather than this default behavior.
     GROUP          | SUPPORT | NOTES
     ============== |=========|======
     Core           | Good    | Core RFC 8949 CBOR data model and syntax
-    Encodings      | NONE    | baseN, MIME, YANG, BER, non-utf8 strings
+    Encodings      | NONE    | baseN, MIME, YANG, BER, non-UTF-8 strings
     Geo            | NONE    | Geographic coordinates and shapes
     Graph          | NONE    | Cyclic, indirected, and self-referential structures
-    Identifiers    | NONE    | UUID, IPLD CID, general identifiers
+    Identifiers    | NONE    | URI, IRI, UUID, IPLD CID, general identifiers
     Networking     | NONE    | IPv4/IPv6 addresses, subnets, and masks
-    Numbers        | Good    | Full Rational and BigInt/Float support
-    Packed Arrays  | Partial | Packed num16, num32, and num64 arrays supported
+    Numbers        | Good    | Rational/BigInt/BigFloat support except non-finite triplets
+    Packed Arrays  | Partial | Packed num16/32/64 arrays supported
     Security       | NONE    | COSE and CWT
-    Special Arrays | NONE    | Explicit multi-dimensional or homogenous arrays
-    Specialty      | NONE    | IoT data, Openswan, PlatformV, RAINS
-    String Hints   | NONE    | JSON conversions, language tags, URIs, Regex
+    Special Arrays | Partial | Sets, explicit multi-dimensional or homogenous arrays
+    Specialty      | NONE    | IoT data, Openswan, PlatformV, DOTS, ERIS, RAINS
+    String Hints   | NONE    | JSON conversions, language tags, regex
     Tag Fallbacks  | Good    | Round tripping of unknown tagged content
     Date/Time      | Partial | All but tagged time (tags 1001-1003) supported
 =end table
@@ -1227,10 +1227,10 @@ rather than this default behavior.
 =begin table :caption<Tag Status Details>
     SPEC         |        TAGS | ENCODE | DECODE | NOTES
     =============|=============|========|========|===================================
-    RFC 8949     |           0 | →      | ✓      | → Encoded as tag 1
+    RFC 8949     |           0 | →      | ✓      | DateTime strings → Encoded as tag 1
     RFC 8949     |           1 | ✓      | ✓      | DateTime/Instant
     RFC 8949     |         2,3 | ✓      | ✓      | (Big) Int
-    RFC 8949     |         4,5 | →      | ✓      | → Encoded as tag 30
+    RFC 8949     |         4,5 | →      | ✓      | Big fractions → Encoded as tag 30
     unassigned   |        6-15 |        |        |
     COSE         |       16-18 | ✘      | ✘      | MAC/Signatures
     unassigned   |       19-20 |        |        |
@@ -1243,7 +1243,7 @@ rather than this default behavior.
     [Vaarala]    |          31 | ✓      | *      | Absent values
     RFC 8949     |       32-34 | ✘      | ✘      | URIs and base64 encoding
     RFC 7094     |          35 | D      | D      | PCRE/ECMA 262 regex (DEPRECATED)
-    RFC 8949     |          36 | ✘      | ✘      | Text-based MIME messages
+    RFC 8949     |          36 | ✘      | ✘      | Text-based MIME message
     [Clemente]   |          37 | ✘      | ✘      | Binary UUID
     [Occil]      |          38 | ✘      | ✘      | Language-tagged string
     [Clemente]   |          39 | ✘      | ✘      | Identifier semantics
@@ -1273,7 +1273,20 @@ rather than this default behavior.
     unassigned   |     113-119 |        |        |
     [Vidovic]    |         120 | ✘      | ✘      | IoT data point
     unassigned   |     121-255 |        |        |
-    XXXX: WIP    |         ... |  |  |
+    [Lehmann]    |         256 | ✘      | ✘      | String backrefs (see tag 25)
+    [Occil]      |         257 | ✘      | ✘      | Binary MIME message
+    [Napoli]     |         258 | ✘?     | ✘?     | Set
+    [Holloway]   |         259 | ✘?     | ✘?     | Map with key-value operations
+    [Raju]       |     260-261 | ✘      | ✘      | IPv4/IPv6/MAC address/network
+    [Raju]       |     262-263 | ✘      | ✘      | Embedded JSON/hex strings
+    [Occil]      |     264-265 | →      | *      | Extended fractions -> Encoded as tag 30
+    [Occil]      |     266-267 | ✘      | ✘      | IRI/IRI reference
+    [Occil]      |     268-270 | ✘✘     | ✘✘     | Triplet non-finite numerics
+    RFC 9132     |         271 | ✘✘     | ✘✘     | DDoS Open Threat Signaling (DOTS)
+    [Vaarala]    |     272-274 | ✘      | ✘      | Non-UTF-8 strings
+    [Cormier]    |         275 | ✘?     | ✘?     | Map containing only string keys
+    [ERIS]       |         276 | ✘      | ✘      | ERIS binary read capability
+    [Meins]      |     277-278 | ✘      | ✘      | Geo area shape/velocity
     unassigned   |    279-1000 |        |        |
     [Bormann]    |   1001-1003 | ✘      | ✘      | Extended time representations
     RFC 8943     |        1004 | →      | ✓      | → Encoded as tag 100
@@ -1282,16 +1295,16 @@ rather than this default behavior.
     unassigned   |  1041-22097 |        |        |
     [Lehmann]    |       22098 | ✘      | ✘      | Hint for additional indirection
     unassigned   | 22099-49999 |        |        |
-    [Tongzhou]   | 50000-50011 | ✘      | ✘      | PlatformV
+    [Tongzhou]   | 50000-50011 | ✘✘     | ✘✘     | PlatformV
     unassigned   | 50012-55798 |        |        |
     RFC 8949     |       55799 | ✓      | ✓      | Self-described CBOR
-    [Richardson] |       55800 | ✘!     | ✘!     | Self-described CBOR Sequence
+    [Richardson] |       55800 | ✘?     | ✘?     | Self-described CBOR Sequence
     unassigned   | 55801-65534 |        |        |
     invalid      |       65535 |        | ✓      | Invalid tag detected
     unassigned   | 65536-15309735 |     |        |
-    [Trammell]   |    15309736 | ✘      | ✘      | RAINS message
+    [Trammell]   |    15309736 | ✘✘     | ✘✘     | RAINS message
     unassigned   | 15309737-1330664269  |  |     |
-    [Hussain]    |  1330664270 | ✘      | ✘      | CBOR-encoded Openswan config file
+    [Hussain]    |  1330664270 | ✘✘     | ✘✘     | CBOR-encoded Openswan config file
     unassigned   | 1330664271-4294967294 |  |    |
     invalid      |  4294967295 |        | ✓      | Invalid tag detected
     unassigned   |         ... |        |        |
@@ -1307,6 +1320,8 @@ rather than this default behavior.
     D      | Deprecated and unsupported tag spec; may eventually be decodable
     ✘      | Not yet implemented
     ✘!     | Not yet implemented, but already requested
+    ✘?     | Not yet implemented, but may be easy to add
+    ✘✘     | Probably won't be implemented in CBOR::Simple
 =end table
 
 
