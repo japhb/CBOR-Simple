@@ -1338,7 +1338,7 @@ C<CBOR::Simple::Tagged> object that records its C<tag-number>; check marks in
 the details table indicate conversion to/from an appropriate native Raku type
 rather than this default behavior.
 
-=begin table :caption<Tag Status Overview: **Native Raku Types**>
+=begin table :caption<Tag Status Overview: Native Raku Types>
     GROUP          | SUPPORT | NOTES
     ============== |=========|======
     Core           | Good    | Core RFC 8949 CBOR data model and syntax
@@ -1351,7 +1351,7 @@ rather than this default behavior.
     Date/Time      | Partial | All but tagged time (tags 1001-1003) supported
 =end table
 
-=begin table :caption<Tag Status Overview: **Specialty Types**>
+=begin table :caption<Tag Status Overview: Specialty Types>
     GROUP          | SUPPORT | NOTES
     ============== |=========|======
     Encodings      | NONE    | baseN, MIME, YANG, BER, non-UTF-8 strings

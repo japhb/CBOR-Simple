@@ -111,7 +111,7 @@ TAG IMPLEMENTATION STATUS
 Note that unrecognized tags will decode to their contents wrapped with a `CBOR::Simple::Tagged` object that records its `tag-number`; check marks in the details table indicate conversion to/from an appropriate native Raku type rather than this default behavior.
 
 <table class="pod-table">
-<caption>Tag Status Overview: **Native Raku Types**</caption>
+<caption>Tag Status Overview: Native Raku Types</caption>
 <thead><tr>
 <th>GROUP</th> <th>SUPPORT</th> <th>NOTES</th>
 </tr></thead>
@@ -121,7 +121,7 @@ Note that unrecognized tags will decode to their contents wrapped with a `CBOR::
 </table>
 
 <table class="pod-table">
-<caption>Tag Status Overview: **Specialty Types**</caption>
+<caption>Tag Status Overview: Specialty Types</caption>
 <thead><tr>
 <th>GROUP</th> <th>SUPPORT</th> <th>NOTES</th>
 </tr></thead>
