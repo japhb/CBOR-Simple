@@ -63,12 +63,27 @@ enum CBORTagNumber (
     # 21..23 NYI
 
     CBOR_Tag_Encoded_CBOR      => 24,
-    CBOR_Tag_Encoded_Sequence  => 63,
 
     # 25..29 NYI
 
     CBOR_Tag_Rational          => 30,
     CBOR_Tag_Absent            => 31,
+
+    # 32..34 NYI
+    # 35     deprecated
+    # 36..47 NYI
+    # 48..60 unassigned or deprecated
+    # 61     NYI
+    # 62     unassigned
+
+    CBOR_Tag_Encoded_Sequence  => 63,
+
+    # 64..79 NYI
+    # 80..87 Supported as a block
+    # 88..95 unassigned
+    # 96..98 NYI
+    # 99     unassigned
+
     CBOR_Tag_Date_Integer      => 100,
     CBOR_Tag_Date_String       => 1004,
     CBOR_Tag_Self_Described    => 55799,
