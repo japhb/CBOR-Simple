@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 96;
+plan 98;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -181,6 +181,10 @@ my @with-nils = ['foo', 1, 2, 'bar'];
 @with-nils.BIND-POS($_, Nil) for 1..2;
 encodes-to @with-nils, '8463666f6fd81ff7d81ff763626172';
 decodes-to ['foo', Mu, Mu, 'bar'], '8463666f6ff7f763626172';
+
+# Extension tag 258: Set
+matches (1, 2, 3).Set, 'd9010283010203';
+matches < a b c >.Set, 'd9010283616161626163';
 
 # Tag 55799: Self-describing CBOR
 decodes-to 100, 'd9d9f71864';

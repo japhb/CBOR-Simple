@@ -86,6 +86,7 @@ enum CBORTagNumber (
 
     CBOR_Tag_Date_Integer      => 100,
 
+    CBOR_Tag_Set               => 258,
     CBOR_Tag_Decimal_Extended  => 264,
     CBOR_Tag_Bigfloat_Extended => 265,
     CBOR_Tag_Date_String       => 1004,
@@ -430,22 +431,28 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 }
             }
             elsif nqp::istype($_, Associative) {
-                write-uint(CBOR_Map, .elems);
-                if RFC8949_Map_Key_Sort {
-                    my @pairs = .map: {
-                        cbor-encode(.key, my $ = 0) => .value
-                    };
-                    @pairs.sort(*.key).map: {
-                        my $bytes = .key.bytes;
-                        $buf.splice($pos, $bytes, .key);
-                        $pos += $bytes;
-                        encode(.value);
-                    }
+                if nqp::istype($_, Setty) {
+                    write-uint(CBOR_Tag, CBOR_Tag_Set);
+                    encode(.keys.sort.cache);
                 }
                 else {
-                    for .sort {
-                        encode(.key);
-                        encode(.value);
+                    write-uint(CBOR_Map, .elems);
+                    if RFC8949_Map_Key_Sort {
+                        my @pairs = .map: {
+                            cbor-encode(.key, my $ = 0) => .value
+                        };
+                        @pairs.sort(*.key).map: {
+                            my $bytes = .key.bytes;
+                            $buf.splice($pos, $bytes, .key);
+                            $pos += $bytes;
+                            encode(.value);
+                        }
+                    }
+                    else {
+                        for .sort {
+                            encode(.key);
+                            encode(.value);
+                        }
                     }
                 }
             }
@@ -855,6 +862,11 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             my $value = 0;
             $value = $value * 256 + $_ for @$bytes;
             +^$value
+        }
+        elsif $tag-number == CBOR_Tag_Set {
+            fail-malformed "Set tag (258) does not contain an array"
+                unless nqp::readuint($cbor, $pos, $ne8) +& CBOR_MajorType_Mask == CBOR_Array;
+            (decode).Set
         }
         elsif $tag-number == CBOR_Tag_Decimal_Fraction
            || $tag-number == CBOR_Tag_Decimal_Extended {
