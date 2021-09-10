@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 111;
+plan 113;
 
 
 # Failure can get "hidden" deep inside decoded structures, so fatalize instead
@@ -79,6 +79,9 @@ malformed($_, "Tag 24 requires byte string content") for
 
 malformed($_, "Tag 63 requires byte string content") for
     < d83f0a d83f2a d83f6141 d83f820102 d83fa0 d83fd83f4103 d83ff7 >;
+
+malformed($_, "Tag 275 requires only string keys") for
+    < d90109a201020304 d90109a26131020304 >;
 
 
 done-testing;

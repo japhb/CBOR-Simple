@@ -3,7 +3,7 @@ use Test;
 
 use CBOR::Simple;
 
-plan 98;
+plan 104;
 
 
 #| Round trip testing to a hex stringification of the CBOR blob
@@ -185,6 +185,21 @@ decodes-to ['foo', Mu, Mu, 'bar'], '8463666f6ff7f763626172';
 # Extension tag 258: Set
 matches (1, 2, 3).Set, 'd9010283010203';
 matches < a b c >.Set, 'd9010283616161626163';
+
+# Extension tag 259: Object-keyed Map; tests adapted from
+# https://github.com/shanewholloway/js-cbor-codec/blob/master/docs/CBOR-259-spec--explicit-maps.md
+decodes-to (my Any %{Mu} = k1 => "v1", k2 => "v2" ),
+           'D90103A2626B31627631626B32627632';
+# decodes-to (my Any %{Mu} = 1942 => "v1", k2 => "v2", [1, 2, 3] => "v3" ),
+#            'D90103A3190796627631626B3262763283010203627633';
+my $hex     = 'D90103A3190796627631626B3262763283010203627633';
+my $decoded = cbor-decode(buf8.new($hex.comb(2).map(*.parse-base(16))));
+isa-ok $decoded, Map, "decodes to a Map";
+isnt $decoded.keyof.^name, 'Str', "does not have string keys";
+is $decoded.AT-KEY(1942), 'v1', "has numeric key";
+is $decoded.AT-KEY('k2'), 'v2', "has string key";
+my $first = $decoded.keys.first(* eqv [1, 2, 3]);
+is $decoded.AT-KEY($first), 'v3', "has array key";
 
 # Tag 55799: Self-describing CBOR
 decodes-to 100, 'd9d9f71864';

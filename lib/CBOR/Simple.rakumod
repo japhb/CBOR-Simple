@@ -87,8 +87,10 @@ enum CBORTagNumber (
     CBOR_Tag_Date_Integer      => 100,
 
     CBOR_Tag_Set               => 258,
+    CBOR_Tag_Object_Key_Map    => 259,
     CBOR_Tag_Decimal_Extended  => 264,
     CBOR_Tag_Bigfloat_Extended => 265,
+    CBOR_Tag_String_Key_Map    => 275,
     CBOR_Tag_Date_String       => 1004,
     CBOR_Tag_Self_Described    => 55799,
 
@@ -868,6 +870,27 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 unless nqp::readuint($cbor, $pos, $ne8) +& CBOR_MajorType_Mask == CBOR_Array;
             (decode).Set
         }
+        elsif $tag-number == CBOR_Tag_Object_Key_Map {
+            fail-malformed "Map with object keys tag (259) does not contain a map"
+                unless nqp::readuint($cbor, $pos, $ne8) +& CBOR_MajorType_Mask == CBOR_Map;
+            my %map := decode;
+            if nqp::istype(%map.keyof, Str) {
+                my %mu-map{Mu};
+                %mu-map{$_} = %map{$_} for %map.keys;
+                %mu-map
+            }
+            else {
+                %map
+            }
+        }
+        elsif $tag-number == CBOR_Tag_String_Key_Map {
+            fail-malformed "Map with string keys tag (275) does not contain a map"
+                unless nqp::readuint($cbor, $pos, $ne8) +& CBOR_MajorType_Mask == CBOR_Map;
+            my %map := decode;
+            fail-malformed "Map with string keys tag (275) contains non-string keys"
+                unless nqp::istype(%map.keyof, Str);
+            %map
+        }
         elsif $tag-number == CBOR_Tag_Decimal_Fraction
            || $tag-number == CBOR_Tag_Decimal_Extended {
             fail-malformed "Decimal Fraction tag ($tag-number) does not contain an array with exactly two elements"
@@ -1209,7 +1232,7 @@ rather than this default behavior.
     GROUP          | SUPPORT | NOTES
     ============== |=========|======
     Core           | Good    | Core RFC 8949 CBOR data model and syntax
-    Collections    | Partial | Sets supported; forced map key types not yet
+    Collections    | Good    | Sets, maps with only object or only string keys
     Encodings      | NONE    | baseN, MIME, YANG, BER, non-UTF-8 strings
     Geo            | NONE    | Geographic coordinates and shapes
     Graph          | NONE    | Cyclic, indirected, and self-referential structures
@@ -1277,7 +1300,7 @@ rather than this default behavior.
     [Lehmann]    |         256 | ✘      | ✘      | String backrefs (see tag 25)
     [Occil]      |         257 | ✘      | ✘      | Binary MIME message
     [Napoli]     |         258 | ✓      | ✓      | Set
-    [Holloway]   |         259 | ✘?     | ✘?     | Map with key-value operations
+    [Holloway]   |         259 | T      | ✓      | Map with object keys
     [Raju]       |     260-261 | ✘      | ✘      | IPv4/IPv6/MAC address/network
     [Raju]       |     262-263 | ✘      | ✘      | Embedded JSON/hex strings
     [Occil]      |     264-265 | →      | *      | Extended fractions -> Encoded as tag 30
@@ -1285,7 +1308,7 @@ rather than this default behavior.
     [Occil]      |     268-270 | ✘✘     | ✘✘     | Triplet non-finite numerics
     RFC 9132     |         271 | ✘✘     | ✘✘     | DDoS Open Threat Signaling (DOTS)
     [Vaarala]    |     272-274 | ✘      | ✘      | Non-UTF-8 strings
-    [Cormier]    |         275 | ✘?     | ✘?     | Map containing only string keys
+    [Cormier]    |         275 | T      | ✓      | Map with only string keys
     [ERIS]       |         276 | ✘      | ✘      | ERIS binary read capability
     [Meins]      |     277-278 | ✘      | ✘      | Geo area shape/velocity
     unassigned   |    279-1000 |        |        |
@@ -1317,6 +1340,7 @@ rather than this default behavior.
     =======|========
     ✓      | Fully supported
     *      | Supported, but see notes below
+    T      | Encoding supported by explicitly tagging contents
     →      | Raku values will be encoded using a different tag
     D      | Deprecated and unsupported tag spec; may eventually be decodable
     ✘      | Not yet implemented
