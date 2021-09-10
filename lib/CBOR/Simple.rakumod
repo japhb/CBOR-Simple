@@ -1406,12 +1406,16 @@ certain tag extensions improve this), so the following mappings apply:
 
 =item To mark a substructure for lazy decoding (treating it as an opaque
       C<Blob> until explicitly decoded), use the tagged value idiom in the
-      SYNOPSIS with `:tag-number(24)` (encoded CBOR value).
+      SYNOPSIS with `:tag-number(24)` (encoded CBOR value) or
+      `:tag-number(63)` (encoded CBOR Sequence).
 
 =item CBOR strings claiming to be longer than C<2⁶‭³‭-1> are treated as malformed.
 
 =item Bigfloats and decimal fractions (tags 4, 5, 264, 265) with very large
       exponents may result in numeric overflow when decoded.
+
+=item Keys for Associative types are sorted using Raku's internal `sort` method
+      rather than the RFC 8949 default sort, because the latter is much slower.
 
 =item C<cbor-diagnostic()> always adds encoding indicators for float values.
 
