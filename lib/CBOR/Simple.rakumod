@@ -1227,7 +1227,7 @@ tag extensions as described below in
 L<TAG IMPLEMENTATION STATUS|#tag-implementation-status>.
 
 
-=head1 PERFORMANCE
+=head2 PERFORMANCE
 
 C<CBOR::Simple> is one of the fastest data structure serialization codecs
 available for Raku.  It is comparable in round-trip speed to C<JSON::Fast>
@@ -1235,6 +1235,100 @@ for data structures that are the most JSON-friendly.  For all other cases
 tested, C<CBOR::Simple> produces smaller, higher fidelity encodings, faster.
 For more detail, and comparison with other Raku serialization codecs, see
 L<serializer-perf|https://github.com/japhb/serializer-perf>.
+
+
+=head2 NYI
+
+Currently known NOT to work:
+
+=item Any tag marked '✘' (valid but not yet supported) or 'D' (deprecated spec)
+      in the ENCODE or DECODE column of the Tag Status Details table below, or
+      any tag not explicitly listed therein, will be treated as an opaque tagged
+      value rather than treated as a native type.
+
+=item Packed arrays of 128-bit floats (num128); these are not supported in
+      Rakudo yet.
+
+=item Encoding I<finite> 16-bit floats (num16); encoding 16-bit NaN and ±Inf,
+      as well as decoding any num16 all work.  This is a performance tradeoff
+      rather than a technical limitation; detecting whether a finite num32 can
+      be shrunk to 16 bits without losing information is costly and rarely
+      results in space savings except in trivial cases (e.g. Nums containing
+      only small integers).
+
+
+=head2 TAG CONTENT STRICTNESS
+
+When encoding, C<CBOR::Simple> makes every attempt to encode tagged content
+strictly within the tag standards as written, always producing spec-compliant
+encoded values.
+
+When decoding, C<CBOR::Simple> will often slightly relax the allowed content
+types in tagged content, especially when later tag proposals made no change
+other than to extend the allowed content types and allocate a new tag number
+for that.  In the extension case C<CBOR::Simple> is likely to allow both the
+old and new tag to accept the same content domain when decoding.
+
+For example, when encoding C<CBOR::Simple> will always encode C<Instant> or
+C<DateTime> as a CBOR epoch-based date/time (tag 1), using standard integer
+or floating point content data.  But when I<decoding>, C<CBOR::Simple> will
+accept any content that decodes properly as a Raku C<Real> value -- and in
+particular will handle a CBOR Rational (tag 30) as another valid content type.
+
+
+=head2 DATE, DATETIME, INSTANT
+
+Raku's builtin time handling is richer than the default CBOR data model (though
+certain tag extensions improve this), so the following mappings apply:
+
+=item1 Encoding
+
+=item2 C<Instant> and C<DateTime> are both written as tag 1 (epoch-based
+       date/time) with integer (if lossless) or floating point content.
+
+=item2 Other C<Dateish> are written as tag 100 (RFC 8943 days since 1970-01-01).
+
+=item1 Decoding
+
+=item2 Tag 0 (date/time string) is parsed as a C<DateTime>.
+
+=item2 Tag 1 (epoch-based date/time) is parsed via C<Instant.from-posix()>, and
+       handles any Real type in the tag content.
+
+=item2 Tag 100 (days since 1970-01-01) is parsed via C<Date.new-from-daycount()>.
+
+=item2 Tag 1004 (date string) is parsed as a C<Date>.
+
+
+=head2 UNDEFINED VALUES
+
+=item CBOR's C<null> is translated as C<Any> in Raku.
+
+=item CBOR's C<undefined> is translated as C<Mu> in Raku.
+
+=item A real C<Nil> in an array (which must be I<bound>, not assigned) is
+      encoded as a CBOR Absent tag (31).  Absent values will be recognized on
+      decode as well, but since array contents are I<assigned> into their
+      parent array during decoding, a C<Nil> in an array will be translated to
+      C<Any> by Raku's array assignment semantics.
+
+
+=head2 OTHER SPECIAL CASES
+
+=item To mark a substructure for lazy decoding (treating it as an opaque
+      C<Blob> until explicitly decoded), use the tagged value idiom in the
+      SYNOPSIS with `:tag-number(24)` (encoded CBOR value) or
+      `:tag-number(63)` (encoded CBOR Sequence).
+
+=item CBOR strings claiming to be longer than C<2⁶‭³‭-1> are treated as malformed.
+
+=item Bigfloats and decimal fractions (tags 4, 5, 264, 265) with very large
+      exponents may result in numeric overflow when decoded.
+
+=item Keys for Associative types are sorted using Raku's internal `sort` method
+      rather than the RFC 8949 default sort, because the latter is much slower.
+
+=item C<cbor-diagnostic()> always adds encoding indicators for float values.
 
 
 =head2 TAG IMPLEMENTATION STATUS
@@ -1364,100 +1458,6 @@ rather than this default behavior.
     ✘?     | Not yet implemented, but may be easy to add
     ✘✘     | Probably won't be implemented in CBOR::Simple
 =end table
-
-
-=head2 NYI
-
-Currently known NOT to work:
-
-=item Any tag marked '✘' (valid but not yet supported) or 'D' (deprecated spec)
-      in the ENCODE or DECODE column of the Tag Status Details table, or any
-      tag not explicitly listed therein, will be treated as an opaque tagged
-      value rather than treated as a native type.
-
-=item Packed arrays of 128-bit floats (num128); these are not supported in
-      Rakudo yet.
-
-=item Encoding I<finite> 16-bit floats (num16); encoding 16-bit NaN and ±Inf,
-      as well as decoding any num16 all work.  This is a performance tradeoff
-      rather than a technical limitation; detecting whether a finite num32 can
-      be shrunk to 16 bits without losing information is costly and rarely
-      results in space savings except in trivial cases (e.g. Nums containing
-      only small integers).
-
-
-=head2 TAG CONTENT STRICTNESS
-
-When encoding, C<CBOR::Simple> makes every attempt to encode tagged content
-strictly within the tag standards as written, always producing spec-compliant
-encoded values.
-
-When decoding, C<CBOR::Simple> will often slightly relax the allowed content
-types in tagged content, especially when later tag proposals made no change
-other than to extend the allowed content types and allocate a new tag number
-for that.  In the extension case C<CBOR::Simple> is likely to allow both the
-old and new tag to accept the same content domain when decoding.
-
-For example, when encoding C<CBOR::Simple> will always encode C<Instant> or
-C<DateTime> as a CBOR epoch-based date/time (tag 1), using standard integer
-or floating point content data.  But when I<decoding>, C<CBOR::Simple> will
-accept any content that decodes properly as a Raku C<Real> value -- and in
-particular will handle a CBOR Rational (tag 30) as another valid content type.
-
-
-=head2 DATE, DATETIME, INSTANT
-
-Raku's builtin time handling is richer than the default CBOR data model (though
-certain tag extensions improve this), so the following mappings apply:
-
-=item1 Encoding
-
-=item2 C<Instant> and C<DateTime> are both written as tag 1 (epoch-based
-       date/time) with integer (if lossless) or floating point content.
-
-=item2 Other C<Dateish> are written as tag 100 (RFC 8943 days since 1970-01-01).
-
-=item1 Decoding
-
-=item2 Tag 0 (date/time string) is parsed as a C<DateTime>.
-
-=item2 Tag 1 (epoch-based date/time) is parsed via C<Instant.from-posix()>, and
-       handles any Real type in the tag content.
-
-=item2 Tag 100 (days since 1970-01-01) is parsed via C<Date.new-from-daycount()>.
-
-=item2 Tag 1004 (date string) is parsed as a C<Date>.
-
-
-=head2 UNDEFINED VALUES
-
-=item CBOR's C<null> is translated as C<Any> in Raku.
-
-=item CBOR's C<undefined> is translated as C<Mu> in Raku.
-
-=item A real C<Nil> in an array (which must be I<bound>, not assigned) is
-      encoded as a CBOR Absent tag (31).  Absent values will be recognized on
-      decode as well, but since array contents are I<assigned> into their
-      parent array during decoding, a C<Nil> in an array will be translated to
-      C<Any> by Raku's array assignment semantics.
-
-
-=head2 OTHER SPECIAL CASES
-
-=item To mark a substructure for lazy decoding (treating it as an opaque
-      C<Blob> until explicitly decoded), use the tagged value idiom in the
-      SYNOPSIS with `:tag-number(24)` (encoded CBOR value) or
-      `:tag-number(63)` (encoded CBOR Sequence).
-
-=item CBOR strings claiming to be longer than C<2⁶‭³‭-1> are treated as malformed.
-
-=item Bigfloats and decimal fractions (tags 4, 5, 264, 265) with very large
-      exponents may result in numeric overflow when decoded.
-
-=item Keys for Associative types are sorted using Raku's internal `sort` method
-      rather than the RFC 8949 default sort, because the latter is much slower.
-
-=item C<cbor-diagnostic()> always adds encoding indicators for float values.
 
 
 =head1 AUTHOR
