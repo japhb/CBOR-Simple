@@ -127,9 +127,9 @@ OTHER SPECIAL CASES
 
   * To mark a substructure for lazy decoding (treating it as an opaque `Blob` until explicitly decoded), use the tagged value idiom in the SYNOPSIS with `:tag-number(24)` (encoded CBOR value).
 
-  * CBOR strings claiming to be longer than `2⁶‭³‭-1` are treated as malformed
+  * CBOR strings claiming to be longer than `2⁶‭³‭-1` are treated as malformed.
 
-  * `cbor-diagnostic()` always adds encoding indicators for float values
+  * `cbor-diagnostic()` always adds encoding indicators for float values.
 
 AUTHOR
 ======

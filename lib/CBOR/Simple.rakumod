@@ -1375,9 +1375,9 @@ certain tag extensions improve this), so the following mappings apply:
       C<Blob> until explicitly decoded), use the tagged value idiom in the
       SYNOPSIS with `:tag-number(24)` (encoded CBOR value).
 
-=item CBOR strings claiming to be longer than C<2⁶‭³‭-1> are treated as malformed
+=item CBOR strings claiming to be longer than C<2⁶‭³‭-1> are treated as malformed.
 
-=item C<cbor-diagnostic()> always adds encoding indicators for float values
+=item C<cbor-diagnostic()> always adds encoding indicators for float values.
 
 
 =head1 AUTHOR
