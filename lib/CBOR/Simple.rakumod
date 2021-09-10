@@ -1259,7 +1259,7 @@ rather than this default behavior.
     COSE         |       16-18 | ✘      | ✘      | MAC/Signatures
     unassigned   |       19-20 |        |        |
     RFC 8949     |       21-23 | ✘      | ✘      | Expected JSON conversion to baseN
-    RFC 8949     |          24 | *      | ✓      | Encoded CBOR data item
+    RFC 8949     |          24 | T      | ✓      | Encoded CBOR data item
     [Lehmann]    |          25 | ✘      | ✘      | String backrefs
     [Lehmann]    |       26,27 | ✘      | ✘      | General serialized objects
     [Lehmann]    |       28,29 | ✘      | ✘      | Shareable referenced values
@@ -1282,7 +1282,7 @@ rather than this default behavior.
     unassigned   |       55-60 |        |        |
     RFC 8392     |          61 | ✘      | ✘      | CBOR Web Token (CWT)
     unassigned   |          62 |        |        |
-    [Bormann]    |          63 | ✓      | ✓      | Encoded CBOR Sequence
+    [Bormann]    |          63 | T      | ✓      | Encoded CBOR Sequence
     RFC 8746     |       64-79 | ✘!     | ✘!     | Packed int arrays
     RFC 8746     |       80-87 | ✓      | ✓      | Packed num arrays (except 128-bit)
     unassigned   |       88-95 |        |        |
