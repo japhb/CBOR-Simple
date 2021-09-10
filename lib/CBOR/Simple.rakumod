@@ -1220,9 +1220,21 @@ my $cbor   = cbor-encode($tagged);
 
 =head1 DESCRIPTION
 
-CBOR::Simple is a trivial implementation of the core functionality of the
-L<CBOR serialization format|https://cbor.io/>, implementing the standard as of
-L<RFC 8949|https://tools.ietf.org/html/rfc8949>.
+C<CBOR::Simple> is an easy-to-use implementation of the core functionality of
+the L<CBOR serialization format|https://cbor.io/>, implementing the standard as
+of L<RFC 8949|https://tools.ietf.org/html/rfc8949>, plus a collection of common
+tag extensions as described below in
+L<TAG IMPLEMENTATION STATUS|#tag-implementation-status>.
+
+
+=head1 PERFORMANCE
+
+C<CBOR::Simple> is one of the fastest data structure serialization codecs
+available for Raku.  It is comparable in round-trip speed to C<JSON::Fast>
+for data structures that are the most JSON-friendly.  For all other cases
+tested, C<CBOR::Simple> produces smaller, higher fidelity encodings, faster.
+For more detail, and comparison with other Raku serialization codecs, see
+L<serializer-perf|https://github.com/japhb/serializer-perf>.
 
 
 =head2 TAG IMPLEMENTATION STATUS
