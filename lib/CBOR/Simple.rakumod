@@ -1209,15 +1209,16 @@ rather than this default behavior.
     GROUP          | SUPPORT | NOTES
     ============== |=========|======
     Core           | Good    | Core RFC 8949 CBOR data model and syntax
+    Collections    | Partial | Sets supported; forced map key types not yet
     Encodings      | NONE    | baseN, MIME, YANG, BER, non-UTF-8 strings
     Geo            | NONE    | Geographic coordinates and shapes
     Graph          | NONE    | Cyclic, indirected, and self-referential structures
     Identifiers    | NONE    | URI, IRI, UUID, IPLD CID, general identifiers
     Networking     | NONE    | IPv4/IPv6 addresses, subnets, and masks
     Numbers        | Good    | Rational/BigInt/BigFloat support except non-finite triplets
-    Packed Arrays  | Partial | Packed num16/32/64 arrays supported
+    Packed Arrays  | Partial | Packed num16/32/64 arrays supported; packed int arrays not
     Security       | NONE    | COSE and CWT
-    Special Arrays | Partial | Sets, explicit multi-dimensional or homogenous arrays
+    Special Arrays | NONE    | Explicit multi-dim/homogenous arrays
     Specialty      | NONE    | IoT data, Openswan, PlatformV, DOTS, ERIS, RAINS
     String Hints   | NONE    | JSON conversions, language tags, regex
     Tag Fallbacks  | Good    | Round tripping of unknown tagged content
@@ -1275,7 +1276,7 @@ rather than this default behavior.
     unassigned   |     121-255 |        |        |
     [Lehmann]    |         256 | ✘      | ✘      | String backrefs (see tag 25)
     [Occil]      |         257 | ✘      | ✘      | Binary MIME message
-    [Napoli]     |         258 | ✘?     | ✘?     | Set
+    [Napoli]     |         258 | ✓      | ✓      | Set
     [Holloway]   |         259 | ✘?     | ✘?     | Map with key-value operations
     [Raju]       |     260-261 | ✘      | ✘      | IPv4/IPv6/MAC address/network
     [Raju]       |     262-263 | ✘      | ✘      | Embedded JSON/hex strings
