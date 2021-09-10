@@ -93,6 +93,7 @@ enum CBORTagNumber (
     CBOR_Tag_String_Key_Map    => 275,
     CBOR_Tag_Date_String       => 1004,
     CBOR_Tag_Self_Described    => 55799,
+    CBOR_Tag_Self_Sequence     => 55800,
 
     CBOR_Tag_Invalid_2Byte     => 65535,
     CBOR_Tag_Invalid_4Byte     => 4294967295,
@@ -133,12 +134,14 @@ my $utf8-encoder = Encoding::Registry.find("utf8").encoder;
 constant RFC8949_Map_Key_Sort = False;
 
 
-# Encode an arbitrary value to CBOR, possibly with leading self-describing tag 55799
-multi cbor-encode(Mu $value, :$cbor-self-tag) is export {
+# Encode an arbitrary value to CBOR, possibly with leading self-describing tag
+multi cbor-encode(Mu $value, :$cbor-self-tag, :$cbor-sequence-tag) is export {
     my $pos;
-    $cbor-self-tag
-    ?? cbor-encode($value, $pos = 3, buf8.new(0xd9, 0xd9, 0xf7))
-    !! cbor-encode($value, $pos = 0)
+    $cbor-sequence-tag
+    ?? cbor-encode($value, $pos = 3, buf8.new(0xd9, 0xd9, 0xf8))
+    !! $cbor-self-tag
+       ?? cbor-encode($value, $pos = 3, buf8.new(0xd9, 0xd9, 0xf7))
+       !! cbor-encode($value, $pos = 0)
 }
 
 # Encode an arbitrary value to CBOR, specifying a buffer position to begin writing
@@ -939,8 +942,9 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 unless nqp::readuint($cbor, $pos, $ne8) +& CBOR_MajorType_Mask == CBOR_BStr;
             Tagged.new(:$tag-number, :value(decode))
         }
-        # Self-tagged CBOR, just unwrap the decoded tag content
-        elsif $tag-number == CBOR_Tag_Self_Described {
+        # Self-tagged CBOR item or CBOR Sequence, just unwrap the decoded tag content
+        elsif $tag-number == CBOR_Tag_Self_Described
+           || $tag-number == CBOR_Tag_Self_Sequence {
             decode
         }
         # Intentionally (as per spec) invalid tag values
@@ -1322,7 +1326,7 @@ rather than this default behavior.
     [Tongzhou]   | 50000-50011 | ✘✘     | ✘✘     | PlatformV
     unassigned   | 50012-55798 |        |        |
     RFC 8949     |       55799 | ✓      | ✓      | Self-described CBOR
-    [Richardson] |       55800 | ✘?     | ✘?     | Self-described CBOR Sequence
+    [Richardson] |       55800 | ✓      | ✓      | Self-described CBOR Sequence
     unassigned   | 55801-65534 |        |        |
     invalid      |       65535 |        | ✓      | Invalid tag detected
     unassigned   | 65536-15309735 |     |        |
