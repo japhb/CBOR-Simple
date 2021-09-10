@@ -1338,24 +1338,29 @@ C<CBOR::Simple::Tagged> object that records its C<tag-number>; check marks in
 the details table indicate conversion to/from an appropriate native Raku type
 rather than this default behavior.
 
-=begin table :caption<Tag Status Overview>
+=begin table :caption<Tag Status Overview: **Native Raku Types**>
     GROUP          | SUPPORT | NOTES
     ============== |=========|======
     Core           | Good    | Core RFC 8949 CBOR data model and syntax
     Collections    | Good    | Sets, maps with only object or only string keys
-    Encodings      | NONE    | baseN, MIME, YANG, BER, non-UTF-8 strings
-    Geo            | NONE    | Geographic coordinates and shapes
     Graph          | NONE    | Cyclic, indirected, and self-referential structures
-    Identifiers    | NONE    | URI, IRI, UUID, IPLD CID, general identifiers
-    Networking     | NONE    | IPv4/IPv6 addresses, subnets, and masks
     Numbers        | Good    | Rational/BigInt/BigFloat support except non-finite triplets
     Packed Arrays  | Partial | Packed num16/32/64 arrays supported; packed int arrays not
-    Security       | NONE    | COSE and CWT
     Special Arrays | NONE    | Explicit multi-dim/homogenous arrays
-    Specialty      | NONE    | IoT data, Openswan, PlatformV, DOTS, ERIS, RAINS
-    String Hints   | NONE    | JSON conversions, language tags, regex
     Tag Fallbacks  | Good    | Round tripping of unknown tagged content
     Date/Time      | Partial | All but tagged time (tags 1001-1003) supported
+=end table
+
+=begin table :caption<Tag Status Overview: **Specialty Types**>
+    GROUP          | SUPPORT | NOTES
+    ============== |=========|======
+    Encodings      | NONE    | baseN, MIME, YANG, BER, non-UTF-8 strings
+    Geo            | NONE    | Geographic coordinates and shapes
+    Identifiers    | NONE    | URI, IRI, UUID, IPLD CID, general identifiers
+    Networking     | NONE    | IPv4/IPv6 addresses, subnets, and masks
+    Security       | NONE    | COSE and CWT
+    Specialty      | NONE    | IoT data, Openswan, PlatformV, DOTS, ERIS, RAINS
+    String Hints   | NONE    | JSON conversions, language tags, regex
 =end table
 
 =begin table :caption<Tag Status Details>

@@ -111,12 +111,22 @@ TAG IMPLEMENTATION STATUS
 Note that unrecognized tags will decode to their contents wrapped with a `CBOR::Simple::Tagged` object that records its `tag-number`; check marks in the details table indicate conversion to/from an appropriate native Raku type rather than this default behavior.
 
 <table class="pod-table">
-<caption>Tag Status Overview</caption>
+<caption>Tag Status Overview: **Native Raku Types**</caption>
 <thead><tr>
 <th>GROUP</th> <th>SUPPORT</th> <th>NOTES</th>
 </tr></thead>
 <tbody>
-<tr> <td>Core</td> <td>Good</td> <td>Core RFC 8949 CBOR data model and syntax</td> </tr> <tr> <td>Collections</td> <td>Good</td> <td>Sets, maps with only object or only string keys</td> </tr> <tr> <td>Encodings</td> <td>NONE</td> <td>baseN, MIME, YANG, BER, non-UTF-8 strings</td> </tr> <tr> <td>Geo</td> <td>NONE</td> <td>Geographic coordinates and shapes</td> </tr> <tr> <td>Graph</td> <td>NONE</td> <td>Cyclic, indirected, and self-referential structures</td> </tr> <tr> <td>Identifiers</td> <td>NONE</td> <td>URI, IRI, UUID, IPLD CID, general identifiers</td> </tr> <tr> <td>Networking</td> <td>NONE</td> <td>IPv4/IPv6 addresses, subnets, and masks</td> </tr> <tr> <td>Numbers</td> <td>Good</td> <td>Rational/BigInt/BigFloat support except non-finite triplets</td> </tr> <tr> <td>Packed Arrays</td> <td>Partial</td> <td>Packed num16/32/64 arrays supported; packed int arrays not</td> </tr> <tr> <td>Security</td> <td>NONE</td> <td>COSE and CWT</td> </tr> <tr> <td>Special Arrays</td> <td>NONE</td> <td>Explicit multi-dim/homogenous arrays</td> </tr> <tr> <td>Specialty</td> <td>NONE</td> <td>IoT data, Openswan, PlatformV, DOTS, ERIS, RAINS</td> </tr> <tr> <td>String Hints</td> <td>NONE</td> <td>JSON conversions, language tags, regex</td> </tr> <tr> <td>Tag Fallbacks</td> <td>Good</td> <td>Round tripping of unknown tagged content</td> </tr> <tr> <td>Date/Time</td> <td>Partial</td> <td>All but tagged time (tags 1001-1003) supported</td> </tr>
+<tr> <td>Core</td> <td>Good</td> <td>Core RFC 8949 CBOR data model and syntax</td> </tr> <tr> <td>Collections</td> <td>Good</td> <td>Sets, maps with only object or only string keys</td> </tr> <tr> <td>Graph</td> <td>NONE</td> <td>Cyclic, indirected, and self-referential structures</td> </tr> <tr> <td>Numbers</td> <td>Good</td> <td>Rational/BigInt/BigFloat support except non-finite triplets</td> </tr> <tr> <td>Packed Arrays</td> <td>Partial</td> <td>Packed num16/32/64 arrays supported; packed int arrays not</td> </tr> <tr> <td>Special Arrays</td> <td>NONE</td> <td>Explicit multi-dim/homogenous arrays</td> </tr> <tr> <td>Tag Fallbacks</td> <td>Good</td> <td>Round tripping of unknown tagged content</td> </tr> <tr> <td>Date/Time</td> <td>Partial</td> <td>All but tagged time (tags 1001-1003) supported</td> </tr>
+</tbody>
+</table>
+
+<table class="pod-table">
+<caption>Tag Status Overview: **Specialty Types**</caption>
+<thead><tr>
+<th>GROUP</th> <th>SUPPORT</th> <th>NOTES</th>
+</tr></thead>
+<tbody>
+<tr> <td>Encodings</td> <td>NONE</td> <td>baseN, MIME, YANG, BER, non-UTF-8 strings</td> </tr> <tr> <td>Geo</td> <td>NONE</td> <td>Geographic coordinates and shapes</td> </tr> <tr> <td>Identifiers</td> <td>NONE</td> <td>URI, IRI, UUID, IPLD CID, general identifiers</td> </tr> <tr> <td>Networking</td> <td>NONE</td> <td>IPv4/IPv6 addresses, subnets, and masks</td> </tr> <tr> <td>Security</td> <td>NONE</td> <td>COSE and CWT</td> </tr> <tr> <td>Specialty</td> <td>NONE</td> <td>IoT data, Openswan, PlatformV, DOTS, ERIS, RAINS</td> </tr> <tr> <td>String Hints</td> <td>NONE</td> <td>JSON conversions, language tags, regex</td> </tr>
 </tbody>
 </table>
 
