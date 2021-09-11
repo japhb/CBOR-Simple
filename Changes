@@ -1,5 +1,12 @@
 Revision history for CBOR-Simple
 
+0.1.1  *WIP*
+  [Tags]
+  - Support Capture round-tripping, using new tag 99 (for which this module is
+    the reference implementation!); for more details see:
+    https://github.com/japhb/cbor-specs/blob/main/capture.md
+
+
 0.1.0  2021-09-09
   [Breaking Changes]
   - Date objects (*not* DateTime) are now properly serialized as tag 100,

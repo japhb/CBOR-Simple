@@ -82,8 +82,8 @@ enum CBORTagNumber (
     # 80..87 Supported as a block
     # 88..95 unassigned
     # 96..98 NYI
-    # 99     unassigned
 
+    CBOR_Tag_Capture           => 99,  # This is the reference implementation!
     CBOR_Tag_Date_Integer      => 100,
 
     CBOR_Tag_Set               => 258,
@@ -355,6 +355,10 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                     my $ex = "Don't know how to encode a {$value.^name}";
                     $*CBOR_SIMPLE_FATAL_ERRORS ?? die $ex !! fail $ex;
                 }
+            }
+            elsif nqp::istype($_, Capture) {
+                write-uint(CBOR_Tag, CBOR_Tag_Capture);
+                encode([.list, .hash]);
             }
             # XXXX: Seq/Iterator?
             elsif nqp::istype($_, Positional) {
@@ -867,6 +871,24 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             my $value = 0;
             $value = $value * 256 + $_ for @$bytes;
             +^$value
+        }
+        elsif $tag-number == CBOR_Tag_Capture {
+            fail-malformed "Capture tag ($tag-number) does not contain an array with exactly two elements"
+                unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_Array + 2;
+
+            my $list := decode;
+            my $hash := decode;
+               $hash := $hash.value
+                     if nqp::istype($hash, Tagged)
+                     && (   $hash.tag-number == CBOR_Tag_Object_Key_Map
+                         || $hash.tag-number == CBOR_Tag_String_Key_Map);
+
+            fail-malformed "Capture tag ($tag-number) array's first element is not an array"
+                unless nqp::istype($list, Array);
+            fail-malformed "Capture tag ($tag-number) array's second element is not a map"
+                unless nqp::istype($hash, Map);
+
+            Capture.new(:$list, :$hash)
         }
         elsif $tag-number == CBOR_Tag_Set {
             fail-malformed "Set tag (258) does not contain an array"
