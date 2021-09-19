@@ -815,7 +815,129 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
                 }
             }
             else {
-                ... "Support decoding intarray";
+                if $size == 1 {
+                    fail-malformed "CBOR extension tag 76 indicating signed 8-bit little-endian packed array is reserved by RFC 8746" if $tag-number == 76;
+
+                    my $array := array[$is-signed ?? int8 !! uint8].new;
+
+                    # Presize array to reduce copying
+                    nqp::setelems($array, $elems);
+
+                    # We can't just memcopy, so apply NQP afterburners instead
+                    my int $p = $pos;
+                    my int $i = -1;
+                    $is-signed
+                    ?? nqp::while(
+                        nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                        nqp::bindpos_i($array, $i,
+                                       nqp::readint($cbor,
+                                                    nqp::add_i($p, $i),
+                                                    $ne8))
+                       )
+                    !! nqp::while(
+                        nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                        nqp::bindpos_i($array, $i,
+                                       nqp::readuint($cbor,
+                                                     nqp::add_i($p, $i),
+                                                     $ne8))
+                       );
+
+                    $pos += $bytes;
+                    $array
+                }
+                elsif $size == 2 {
+                    my $array := array[$is-signed ?? int16 !! uint16].new;
+
+                    # Presize array to reduce copying
+                    nqp::setelems($array, $elems);
+
+                    # We can't just memcopy, so apply NQP afterburners instead
+                    my int $p = $pos;
+                    my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_16_BIT, $endian);
+                    my int $i = -1;
+                    $is-signed
+                    ?? nqp::while(
+                        nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                        nqp::bindpos_i($array, $i,
+                                       nqp::readint($cbor,
+                                                    nqp::add_i($p,
+                                                               nqp::bitshiftl_i($i, 1)),
+                                                    $t))
+                       )
+                    !! nqp::while(
+                        nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                        nqp::bindpos_i($array, $i,
+                                       nqp::readuint($cbor,
+                                                     nqp::add_i($p,
+                                                                nqp::bitshiftl_i($i, 1)),
+                                                     $t))
+                       );
+
+                    $pos += $bytes;
+                    $array
+                }
+                elsif $size == 4 {
+                    my $array := array[$is-signed ?? int32 !! uint32].new;
+
+                    # Presize array to reduce copying
+                    nqp::setelems($array, $elems);
+
+                    # We can't just memcopy, so apply NQP afterburners instead
+                    my int $p = $pos;
+                    my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_32_BIT, $endian);
+                    my int $i = -1;
+                    $is-signed
+                    ?? nqp::while(
+                        nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                        nqp::bindpos_i($array, $i,
+                                       nqp::readint($cbor,
+                                                    nqp::add_i($p,
+                                                               nqp::bitshiftl_i($i, 2)),
+                                                    $t))
+                       )
+                    !! nqp::while(
+                        nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                        nqp::bindpos_i($array, $i,
+                                       nqp::readuint($cbor,
+                                                     nqp::add_i($p,
+                                                                nqp::bitshiftl_i($i, 2)),
+                                                     $t))
+                       );
+
+                    $pos += $bytes;
+                    $array
+                }
+                elsif $size == 8 {
+                    my $array := array[$is-signed ?? int64 !! uint64].new;
+
+                    # Presize array to reduce copying
+                    nqp::setelems($array, $elems);
+
+                    # We can't just memcopy, so apply NQP afterburners instead
+                    my int $p = $pos;
+                    my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_64_BIT, $endian);
+                    my int $i = -1;
+                    $is-signed
+                    ?? nqp::while(
+                        nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                        nqp::bindpos_i($array, $i,
+                                       nqp::readint($cbor,
+                                                    nqp::add_i($p,
+                                                               nqp::bitshiftl_i($i, 3)),
+                                                    $t))
+                       )
+                    !! nqp::while(
+                        nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                        nqp::bindpos_i($array, $i,
+                                       nqp::readuint($cbor,
+                                                     nqp::add_i($p,
+                                                                nqp::bitshiftl_i($i, 3)),
+                                                     $t))
+                       );
+
+                    $pos += $bytes;
+                    $array
+                }
             }
         }
         elsif $tag-number == CBOR_Tag_Rational {
