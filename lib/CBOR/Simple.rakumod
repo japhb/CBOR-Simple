@@ -385,50 +385,54 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
                 if nqp::istype($_, array) {
                     my $array     := $_<>;
                     my $type       = $array.of;
+                    my $type-tag   = %type-tag{$type.^name};
                     my int $elems  = $array.elems;
-                    # write-uint(CBOR_Tag, %type-tag{$type.^name});
 
-                    if $type === num32 {
-                        write-uint(CBOR_Tag, %type-tag{$type.^name});
-                        write-uint(CBOR_BStr, $elems * 4);
+                    if $type-tag {
+                        # Packed array types supported in RFC 8746
+                        write-uint(CBOR_Tag, $type-tag);
 
-                        my int $p = $pos;
-                        my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_32_BIT,
-                                                 NativeEndian);
-                        my int $i = -1;
-                        nqp::while(
-                            nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
-                            nqp::writenum($buf,
-                                          nqp::add_i($p, nqp::bitshiftl_i($i, 2)),
-                                          nqp::atpos_n($array, $i),
-                                          $t)
+                        if $type === num32 {
+                            write-uint(CBOR_BStr, $elems * 4);
 
-                        );
+                            my int $p = $pos;
+                            my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_32_BIT,
+                                                     NativeEndian);
+                            my int $i = -1;
+                            nqp::while(
+                                nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                                nqp::writenum($buf,
+                                              nqp::add_i($p, nqp::bitshiftl_i($i, 2)),
+                                              nqp::atpos_n($array, $i),
+                                              $t)
+                            );
 
-                        $pos += $elems * 4;
-                    }
-                    elsif $type === num64 || $type === num  {
-                        write-uint(CBOR_Tag, %type-tag{$type.^name});
-                        write-uint(CBOR_BStr, $elems * 8);
+                            $pos += $elems * 4;
+                        }
+                        elsif $type === num64 || $type === num  {
+                            write-uint(CBOR_BStr, $elems * 8);
 
-                        my int $p = $pos;
-                        my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_64_BIT,
-                                                 NativeEndian);
-                        my int $i = -1;
-                        nqp::while(
-                            nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
-                            nqp::writenum($buf,
-                                          nqp::add_i($p, nqp::bitshiftl_i($i, 3)),
-                                          nqp::atpos_n($array, $i),
-                                          $t)
+                            my int $p = $pos;
+                            my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_64_BIT,
+                                                     NativeEndian);
+                            my int $i = -1;
+                            nqp::while(
+                                nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                                nqp::writenum($buf,
+                                              nqp::add_i($p, nqp::bitshiftl_i($i, 3)),
+                                              nqp::atpos_n($array, $i),
+                                              $t)
+                            );
 
-                        );
-
-                        $pos += $elems * 8;
+                            $pos += $elems * 8;
+                        }
+                        else {
+                            ... "Support packed int/uint arrays";
+                        }
                     }
                     else {
-                        # XXXX: Fake other packed array types by writing them
-                        #       as standard Arrays instead
+                        # Fake other packed array types (e.g. strarray)
+                        # by writing them as standard CBOR Arrays instead
                         write-uint(CBOR_Array, $elems);
                         encode($_) for @$_;
                     }
