@@ -88,7 +88,7 @@ matches -1000, '3903e7';
 
 # FLOATS
 
-# XXXX: Requires write support for 16-bit nums
+# XXXX: Requires write support for general 16-bit nums
 # matches   0.0e0, 'f90000';
 # matches  -0.0e0, 'f98000';
 # matches   1.0e0, 'f93c00';
@@ -106,7 +106,7 @@ matches 3.4028234663852886e+38, 'fa7f7fffff';
 matches 1.0e+300, 'fb7e37e43c8800759c';
 matches   -4.1e0, 'fbc010666666666666';
 
-# XXXX: Requires write support for 16-bit nums
+# XXXX: Requires write support for general 16-bit nums
 # matches 5.960464477539063e-8, 'f90001';
 # matches 0.00006103515625e0,   'f90400';
 decodes-to 5.960464477539063e-8, 'f90001';
