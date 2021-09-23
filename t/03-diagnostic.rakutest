@@ -1,22 +1,11 @@
-use v6.d;
 use Test;
+use lib $*PROGRAM.sibling('lib');
+use CodecMatches;
 
 use CBOR::Simple;
 
+
 plan 75;
-
-
-#| Check for canonical diagnostic output using hex stringification of a CBOR blob
-multi diagnostic-is(Str:D $diag, Str:D $cbor) {
-    diagnostic-is($diag, buf8.new($cbor.comb(2).map(*.parse-base(16))))
-}
-
-#| Check for canonical diagnostic output directly on a CBOR blob
-multi diagnostic-is(Str:D $diag, Buf:D $cbor) {
-    my $as-hex = $cbor.map(*.fmt('%02X')).join;
-
-    is cbor-diagnostic($cbor), $diag, "cbor-diagnostic($as-hex) is correct"
-}
 
 
 ### Below adapted from https://tools.ietf.org/html/rfc8949#appendix-A

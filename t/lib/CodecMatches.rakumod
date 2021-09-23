@@ -8,6 +8,7 @@ sub hex-decode(Str:D $hex, $buf-type = buf8) is export {
     $buf-type.new($hex.comb(2).map(*.parse-base(16)))
 }
 
+
 #| Round trip testing to a hex stringification of the CBOR blob
 multi matches(Mu $value, Str:D $cbor) is export {
     matches($value, hex-decode($cbor))
@@ -54,6 +55,19 @@ multi decodes-to(Mu $value, Buf:D $cbor) is export {
     else {
         is        $as-value, $value, "cbor-decode($as-hex) produces correct value"
     }
+}
+
+
+#| Check for canonical diagnostic output using hex stringification of a CBOR blob
+multi diagnostic-is(Str:D $diag, Str:D $cbor) is export {
+    diagnostic-is($diag, hex-decode($cbor))
+}
+
+#| Check for canonical diagnostic output directly on a CBOR blob
+multi diagnostic-is(Str:D $diag, Buf:D $cbor) is export {
+    my $as-hex = $cbor.map(*.fmt('%02X')).join;
+
+    is cbor-diagnostic($cbor), $diag, "cbor-diagnostic($as-hex) is correct"
 }
 
 
