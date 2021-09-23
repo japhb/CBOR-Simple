@@ -5,7 +5,7 @@ use CodecMatches;
 use CBOR::Simple;
 
 
-plan 13;
+plan 16;
 
 
 ### Tests for RFC 8746 typed arrays (https://www.rfc-editor.org/rfc/rfc8746.html)
@@ -37,6 +37,19 @@ my $num64-basic-le = 'd8565838000000000000f07f000000000000f0ff'
                    ~ '000000000000f87f00000000000000000000000000000080'
                    ~ '9a9999999999f13f9c7500883ce4377e';
 decodes-to $num64-basic, $_ for $num64-basic-be, $num64-basic-le;
+
+
+# TEST 8-BIT ENDIAN-AGNOSTIC ARRAYS
+
+my $uint8-basic    = array[uint8].new(0, 1, 126, 127, 128, 129, 254, 255);
+my $byte-basic     = array[byte ].new(0, 1, 126, 127, 128, 129, 254, 255);
+my $int8-basic     = array[int8 ].new(-128, -127, -1, 0, 1, 42, 126, 127);
+my $uint8-basic-ne = 'd8404800017e7f8081feff';
+my $int8-basic-ne  = 'd848488081ff00012a7e7f';
+matches $uint8-basic, $uint8-basic-ne;
+matches $int8-basic,  $int8-basic-ne;
+
+encodes-to $byte-basic, $uint8-basic-ne;
 
 
 # TEST FOR APPROPRIATE NATIVE ENDIAN ENCODING
