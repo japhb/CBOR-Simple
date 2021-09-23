@@ -137,7 +137,66 @@ matches True,  'f5';
 matches Any,   'f6';
 matches Mu,    'f7';
 
-# XXXX: Other simples
+
+# BINARY BUFFERS
+
+matches buf8.new,          '40';
+matches buf8.new(1,2,3,4), '4401020304';
+
+
+# STRINGS
+
+matches "",       '60';
+matches "a",      '6161';
+matches "IETF",   '6449455446';
+matches "\"\\",   '62225c';
+matches "\x00fc", '62c3bc';
+matches "\x6c34", '63e6b0b4';
+
+my $utf16 = blob16.new(0xd800, 0xdd51);
+my $str   = $utf16.decode('utf-16');
+matches $str, '64f0908591';
+
+
+# ARRAYS
+
+matches [],                  '80';
+matches [1, 2, 3],           '83010203';
+matches [1, [2, 3], [4, 5]], '8301820203820405';
+matches (my @ = 1..25),      '98190102030405060708090a0b0c0d0e0f101112131415161718181819';
+
+
+# MAPS
+
+matches {},                    'a0';
+my %intkey{Mu} = 1, 2, 3, 4;
+matches %intkey,               'a201020304';
+matches {a => 1, b => [2, 3]}, 'a26161016162820203';
+matches ["a", {b => "c"}],     '826161a161626163';
+matches {a => "A", b => "B", c => "C", d => "D", e => "E"},
+        'a56161614161626142616361436164614461656145';
+
+
+# INDEFINITE LENGTH VALUES
+
+decodes-to buf8.new(1,2,3,4,5), '5f42010243030405ff';
+decodes-to "streaming",         '7f657374726561646d696e67ff';
+
+# This test from section 3.2.3 of https://tools.ietf.org/html/rfc8949
+decodes-to buf8.new(0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x99),
+           '5f44aabbccdd43eeff99ff';
+
+decodes-to [],                  '9fff';
+decodes-to [1, [2, 3], [4, 5]], '9f018202039f0405ffff';
+decodes-to [1, [2, 3], [4, 5]], '9f01820203820405ff';
+decodes-to [1, [2, 3], [4, 5]], '83018202039f0405ff';
+decodes-to [1, [2, 3], [4, 5]], '83019f0203ff820405';
+decodes-to (my @ = 1..25),
+           '9f0102030405060708090a0b0c0d0e0f101112131415161718181819ff';
+
+decodes-to {a => 1, b => [2, 3]},    'bf61610161629f0203ffff';
+decodes-to ["a", {b => "c"}],        '826161bf61626163ff';
+decodes-to {Fun => True, Amt => -2}, 'bf6346756ef563416d7421ff';
 
 
 # TAGGED VALUES
@@ -230,70 +289,6 @@ decodes-to 100, 'd9d9f81864';
 my $as-seq = cbor-encode(123, :cbor-sequence-tag);
 is-deeply $as-seq, hex-decode('d9d9f8187b'),
           "cbor-encode(123, :cbor-sequence-tag) produces correct blob";
-
-
-# XXXX: Other known tags
-
-
-# BINARY BUFFERS
-
-matches buf8.new,          '40';
-matches buf8.new(1,2,3,4), '4401020304';
-
-
-# STRINGS
-
-matches "",       '60';
-matches "a",      '6161';
-matches "IETF",   '6449455446';
-matches "\"\\",   '62225c';
-matches "\x00fc", '62c3bc';
-matches "\x6c34", '63e6b0b4';
-
-my $utf16 = blob16.new(0xd800, 0xdd51);
-my $str   = $utf16.decode('utf-16');
-matches $str, '64f0908591';
-
-
-# ARRAYS
-
-matches [],                  '80';
-matches [1, 2, 3],           '83010203';
-matches [1, [2, 3], [4, 5]], '8301820203820405';
-matches (my @ = 1..25),      '98190102030405060708090a0b0c0d0e0f101112131415161718181819';
-
-
-# MAPS
-
-matches {},                    'a0';
-my %intkey{Mu} = 1, 2, 3, 4;
-matches %intkey,               'a201020304';
-matches {a => 1, b => [2, 3]}, 'a26161016162820203';
-matches ["a", {b => "c"}],     '826161a161626163';
-matches {a => "A", b => "B", c => "C", d => "D", e => "E"},
-        'a56161614161626142616361436164614461656145';
-
-
-# INDEFINITE LENGTH VALUES
-
-decodes-to buf8.new(1,2,3,4,5), '5f42010243030405ff';
-decodes-to "streaming",         '7f657374726561646d696e67ff';
-
-# This test from section 3.2.3 of https://tools.ietf.org/html/rfc8949
-decodes-to buf8.new(0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x99),
-           '5f44aabbccdd43eeff99ff';
-
-decodes-to [],                  '9fff';
-decodes-to [1, [2, 3], [4, 5]], '9f018202039f0405ffff';
-decodes-to [1, [2, 3], [4, 5]], '9f01820203820405ff';
-decodes-to [1, [2, 3], [4, 5]], '83018202039f0405ff';
-decodes-to [1, [2, 3], [4, 5]], '83019f0203ff820405';
-decodes-to (my @ = 1..25),
-           '9f0102030405060708090a0b0c0d0e0f101112131415161718181819ff';
-
-decodes-to {a => 1, b => [2, 3]},    'bf61610161629f0203ffff';
-decodes-to ["a", {b => "c"}],        '826161bf61626163ff';
-decodes-to {Fun => True, Amt => -2}, 'bf6346756ef563416d7421ff';
 
 
 done-testing;
