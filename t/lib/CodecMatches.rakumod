@@ -55,3 +55,12 @@ multi decodes-to(Mu $value, Buf:D $cbor) is export {
         is        $as-value, $value, "cbor-decode($as-hex) produces correct value"
     }
 }
+
+
+# Failure can get "hidden" deep inside decoded structures, so fatalize instead
+PROCESS::<$CBOR_SIMPLE_FATAL_ERRORS> = True;
+
+#| Malformed input to decoder
+sub malformed(Str:D $cbor, Str:D $reason) is export {
+    throws-like { cbor-decode(hex-decode($cbor)) }, X::Malformed, "$reason ($cbor)"
+}

@@ -1,18 +1,11 @@
-use v6.d;
 use Test;
+use lib $*PROGRAM.sibling('lib');
+use CodecMatches;
 
 use CBOR::Simple;
 
+
 plan 117;
-
-
-# Failure can get "hidden" deep inside decoded structures, so fatalize instead
-my $*CBOR_SIMPLE_FATAL_ERRORS = True;
-
-sub malformed(Str:D $cbor, Str:D $reason) {
-    my $buf = buf8.new($cbor.comb(2).map(*.parse-base(16)));
-    throws-like { cbor-decode($buf) }, X::Malformed, "$reason ($cbor)";
-}
 
 
 ### Below adapted from https://tools.ietf.org/html/rfc8949#appendix-F
