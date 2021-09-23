@@ -1,0 +1,63 @@
+use Test;
+use lib $*PROGRAM.sibling('lib');
+use CodecMatches;
+
+use CBOR::Simple;
+
+
+plan 13;
+
+
+### Tests for RFC 8746 typed arrays (https://www.rfc-editor.org/rfc/rfc8746.html)
+
+
+# DECODE BOTH BIG AND LITTLE ENDIAN ON ANY HOST
+# diag "Testing bi-endian decoding";
+
+my $num32-empty-be = 'd85140';
+my $num32-empty-le = 'd85540';
+my $num64-empty-be = 'd85240';
+my $num64-empty-le = 'd85640';
+decodes-to array[num32].new(), $_ for $num32-empty-be, $num32-empty-le;
+decodes-to array[num64].new(), $_ for $num64-empty-be, $num64-empty-le;
+
+my $num32-basic    = array[num32].new(Inf, -Inf, NaN, 0.0e0, -0.0e0, 1.0e0, 100000e0);
+my $num32-basic-be = 'd851581c7f800000ff8000007fc00000'
+                   ~ '00000000800000003f80000047c35000';
+my $num32-basic-le = 'd855581c0000807f000080ff0000c07f'
+                   ~ '00000000000000800000803f0050c347';
+decodes-to $num32-basic, $_ for $num32-basic-be, $num32-basic-le;
+
+my $num64-basic    = array[num64].new(Inf, -Inf, NaN, 0.0e0, -0.0e0, 1.1e0, 1.0e+300);
+my $num-basic      = array[num  ].new(Inf, -Inf, NaN, 0.0e0, -0.0e0, 1.1e0, 1.0e+300);
+my $num64-basic-be = 'd85258387ff0000000000000fff0000000000000'
+                   ~ '7ff800000000000000000000000000008000000000000000'
+                   ~ '3ff199999999999a7e37e43c8800759c';
+my $num64-basic-le = 'd8565838000000000000f07f000000000000f0ff'
+                   ~ '000000000000f87f00000000000000000000000000000080'
+                   ~ '9a9999999999f13f9c7500883ce4377e';
+decodes-to $num64-basic, $_ for $num64-basic-be, $num64-basic-le;
+
+
+# TEST FOR APPROPRIATE NATIVE ENDIAN ENCODING
+
+if Kernel.endian == BigEndian {
+    # diag "Testing BigEndian native encoding";
+    encodes-to array[num32].new(), $num32-empty-be;
+    encodes-to array[num64].new(), $num64-empty-be;
+    encodes-to $num32-basic,       $num32-basic-be;
+    encodes-to $num64-basic,       $num64-basic-be;
+    encodes-to $num-basic,         $num64-basic-be;
+}
+# LittleEndian Kernel
+else {
+    # diag "Testing LittleEndian native encoding";
+    encodes-to array[num32].new(), $num32-empty-le;
+    encodes-to array[num64].new(), $num64-empty-le;
+    encodes-to $num32-basic,       $num32-basic-le;
+    encodes-to $num64-basic,       $num64-basic-le;
+    encodes-to $num-basic,         $num64-basic-le;
+}
+
+
+done-testing;
