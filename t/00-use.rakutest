@@ -2,7 +2,12 @@ use v6.d;
 use Test;
 
 
+# Core module
 use CBOR::Simple;
+
+# Test helper
+use lib $*PROGRAM.sibling('lib');
+use CodecMatches;
 
 
 pass "all modules loaded successfully";

@@ -1,63 +1,11 @@
-use v6.d;
 use Test;
+use lib $*PROGRAM.sibling('lib');
+use CodecMatches;
 
 use CBOR::Simple;
 
+
 plan 112;
-
-
-#| Simple converter utility: hex string to binary buf
-sub hex-decode(Str:D $hex, $buf-type = buf8) {
-    $buf-type.new($hex.comb(2).map(*.parse-base(16)))
-}
-
-#| Round trip testing to a hex stringification of the CBOR blob
-multi matches(Mu $value, Str:D $cbor) {
-    matches($value, hex-decode($cbor))
-}
-
-#| Round trip testing directly to a CBOR blob
-multi matches(Mu $value, Buf:D $cbor) {
-    subtest "$value.raku() handled correctly", {
-        my $as-cbor  = cbor-encode($value);
-        my $as-value = cbor-decode($cbor);
-
-        is-deeply $as-cbor,  $cbor,  "cbor-encode produces correct blob";
-        is-deeply $as-value, $value, "cbor-decode produces correct value" if $value  ~~ Any;
-        is        $as-value, Mu,     "cbor-decode produces correct value" if $value !~~ Any;
-    }
-}
-
-
-#| Unidirectional ENcoding testing, matching a hex stringification of the expected CBOR blob
-multi encodes-to(Mu $value, Str:D $cbor) {
-    encodes-to($value, hex-decode($cbor))
-}
-
-#| Unidirectional ENcoding testing, matching an expected CBOR blob
-multi encodes-to(Mu $value, Buf:D $cbor) {
-    my $as-cbor = cbor-encode($value);
-    is-deeply $as-cbor, $cbor, "cbor-encode({$value.raku}) produces correct blob"
-}
-
-
-#| Unidirectional DEcoding testing, from a hex stringification of the actual CBOR blob
-multi decodes-to(Mu $value, Str:D $cbor) {
-    decodes-to($value, hex-decode($cbor))
-}
-
-#| Unidirectional DEcoding testing, from an actual CBOR blob
-multi decodes-to(Mu $value, Buf:D $cbor) {
-    my $as-value = cbor-decode($cbor);
-    my $as-hex   = $cbor.map(*.fmt('%02X')).join;
-
-    if $value ~~ Any {
-        is-deeply $as-value, $value, "cbor-decode($as-hex) produces correct value"
-    }
-    else {
-        is        $as-value, $value, "cbor-decode($as-hex) produces correct value"
-    }
-}
 
 
 ### Below adapted from https://tools.ietf.org/html/rfc8949#appendix-A
