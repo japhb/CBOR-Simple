@@ -362,73 +362,100 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             }
             # XXXX: Seq/Iterator?
             elsif nqp::istype($_, Positional) {
-                constant $endian   = Kernel.endian == LittleEndian ?? 4 !! 0;
-                constant %type-tag =
-                    byte   => 0x40,
-                    uint8  => 0x40,
-                    uint16 => 0x41 + $endian,
-                    uint32 => 0x42 + $endian,
-                    uint64 => 0x43 + $endian,
-                    uint   => 0x43 + $endian,
+                constant $endian    = Kernel.endian == LittleEndian ?? 4 !! 0;
+                constant %type-info =
+                    #          TAG         SHIFT  BYTES  CONSTANT
+                    byte   => (0x40,           0, 1, nqp::const::BINARY_SIZE_8_BIT),
+                    uint8  => (0x40,           0, 1, nqp::const::BINARY_SIZE_8_BIT),
+                    uint16 => (0x41 + $endian, 1, 2, nqp::const::BINARY_SIZE_16_BIT),
+                    uint32 => (0x42 + $endian, 2, 4, nqp::const::BINARY_SIZE_32_BIT),
+                    uint64 => (0x43 + $endian, 3, 8, nqp::const::BINARY_SIZE_64_BIT),
+                    uint   => (0x43 + $endian, 3, 8, nqp::const::BINARY_SIZE_64_BIT),
 
-                    int8   => 0x48,
-                    int16  => 0x49 + $endian,
-                    int32  => 0x4A + $endian,
-                    int64  => 0x4B + $endian,
-                    int    => 0x4B + $endian,
+                    int8   => (0x48,           0, 1, nqp::const::BINARY_SIZE_8_BIT),
+                    int16  => (0x49 + $endian, 1, 2, nqp::const::BINARY_SIZE_16_BIT),
+                    int32  => (0x4A + $endian, 2, 4, nqp::const::BINARY_SIZE_32_BIT),
+                    int64  => (0x4B + $endian, 3, 8, nqp::const::BINARY_SIZE_64_BIT),
+                    int    => (0x4B + $endian, 3, 8, nqp::const::BINARY_SIZE_64_BIT),
 
-                    num32  => 0x51 + $endian,
-                    num64  => 0x52 + $endian,
-                    num    => 0x52 + $endian;
+                    num32  => (0x51 + $endian, 2, 4, nqp::const::BINARY_SIZE_32_BIT),
+                    num64  => (0x52 + $endian, 3, 8, nqp::const::BINARY_SIZE_64_BIT),
+                    num    => (0x52 + $endian, 3, 8, nqp::const::BINARY_SIZE_64_BIT);
 
-                # Pack native arrays using RFC 8746 Typed Arrays tag
+                # Try to pack native arrays using RFC 8746 Typed Arrays tag
                 if nqp::istype($_, array) {
                     my $array     := $_<>;
                     my $type       = $array.of;
-                    my $type-tag   = %type-tag{$type.^name};
+                    my $type-info  = %type-info{$type.^name};
                     my int $elems  = $array.elems;
 
-                    if $type-tag {
-                        # Packed array types supported in RFC 8746
-                        write-uint(CBOR_Tag, $type-tag);
+                    # Packed array types supported in RFC 8746
+                    if $type-info {
+                        my $tag   = $type-info[0];
+                        write-uint(CBOR_Tag, $tag);
 
-                        if $type === num32 {
-                            write-uint(CBOR_BStr, $elems * 4);
+                        my $bytes = $elems * $type-info[2];
+                        write-uint(CBOR_BStr, $bytes);
 
-                            my int $p = $pos;
-                            my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_32_BIT,
-                                                     NativeEndian);
-                            my int $i = -1;
+                        my int $s = $type-info[1];
+                        my int $t = nqp::bitor_i($type-info[3], NativeEndian);
+                        my int $p = $pos;
+                        my int $i = -1;
+
+                        # num* types
+                        if $tag >= 0x50 {
                             nqp::while(
-                                nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
+                                nqp::islt_i(($i = nqp::add_i($i, 1)), $elems),
                                 nqp::writenum($buf,
-                                              nqp::add_i($p, nqp::bitshiftl_i($i, 2)),
+                                              nqp::add_i($p, nqp::bitshiftl_i($i, $s)),
                                               nqp::atpos_n($array, $i),
                                               $t)
                             );
-
-                            $pos += $elems * 4;
                         }
-                        elsif $type === num64 || $type === num  {
-                            write-uint(CBOR_BStr, $elems * 8);
-
-                            my int $p = $pos;
-                            my int $t = nqp::bitor_i(nqp::const::BINARY_SIZE_64_BIT,
-                                                     NativeEndian);
-                            my int $i = -1;
-                            nqp::while(
-                                nqp::islt_i(($i = nqp::add_i($i,1)),$elems),
-                                nqp::writenum($buf,
-                                              nqp::add_i($p, nqp::bitshiftl_i($i, 3)),
-                                              nqp::atpos_n($array, $i),
-                                              $t)
-                            );
-
-                            $pos += $elems * 8;
+                        # (signed) int* types
+                        elsif $tag >= 0x48 {
+                            if $s {
+                                nqp::while(
+                                    nqp::islt_i(($i = nqp::add_i($i, 1)), $elems),
+                                    nqp::writeint($buf,
+                                                  nqp::add_i($p, nqp::bitshiftl_i($i, $s)),
+                                                  nqp::atpos_i($array, $i),
+                                                  $t)
+                                );
+                            }
+                            else {
+                                nqp::while(
+                                    nqp::islt_i(($i = nqp::add_i($i, 1)), $elems),
+                                    nqp::writeint($buf,
+                                                  nqp::add_i($p, $i),
+                                                  nqp::atpos_i($array, $i),
+                                                  $t)
+                                );
+                            }
                         }
+                        # uint* types
                         else {
-                            ... "Support packed int/uint arrays";
+                            if $s {
+                                nqp::while(
+                                    nqp::islt_i(($i = nqp::add_i($i, 1)), $elems),
+                                    nqp::writeuint($buf,
+                                                   nqp::add_i($p, nqp::bitshiftl_i($i, $s)),
+                                                   nqp::atpos_i($array, $i),
+                                                   $t)
+                                );
+                            }
+                            else {
+                                nqp::while(
+                                    nqp::islt_i(($i = nqp::add_i($i, 1)), $elems),
+                                    nqp::writeuint($buf,
+                                                   nqp::add_i($p, $i),
+                                                   nqp::atpos_i($array, $i),
+                                                   $t)
+                                );
+                            }
                         }
+
+                        $pos += $bytes;
                     }
                     else {
                         # Fake other packed array types (e.g. strarray)
