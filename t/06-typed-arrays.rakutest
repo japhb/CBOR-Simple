@@ -5,7 +5,7 @@ use CodecMatches;
 use CBOR::Simple;
 
 
-plan 28;
+plan 36;
 
 
 ### Tests for RFC 8746 typed arrays (https://www.rfc-editor.org/rfc/rfc8746.html)
@@ -38,6 +38,53 @@ my $num64-basic-le = 'd8565838000000000000f07f000000000000f0ff'
                    ~ '000000000000f87f00000000000000000000000000000080'
                    ~ '9a9999999999f13f9c7500883ce4377e';
 decodes-to $num64-basic, $_ for $num64-basic-be, $num64-basic-le;
+
+
+# int64/uint64/int/uint
+my $int64-basic    = array[int64].new(-9223372036854775808, -9223372036854775807,
+                                      -4294967297, -4294967296, -4294967295,
+                                      -2147483649, -2147483648, -2147483647,
+                                      0, 2147483646, 2147483647, 2147483648,
+                                      4294967294, 4294967295, 4294967296,
+                                      9223372036854775806, 9223372036854775807);
+my $int-basic      = array[int  ].new(-9223372036854775808, -9223372036854775807,
+                                      -4294967297, -4294967296, -4294967295,
+                                      -2147483649, -2147483648, -2147483647,
+                                      0, 2147483646, 2147483647, 2147483648,
+                                      4294967294, 4294967295, 4294967296,
+                                      9223372036854775806, 9223372036854775807);
+my $int64-basic-be = 'd84b588880000000000000008000000000000001fffffffeffffffff'
+                   ~ 'ffffffff00000000ffffffff00000001ffffffff7fffffff'
+                   ~ 'ffffffff80000000ffffffff800000010000000000000000'
+                   ~ '000000007ffffffe000000007fffffff0000000080000000'
+                   ~ '00000000fffffffe00000000ffffffff0000000100000000'
+                   ~ '7ffffffffffffffe7fffffffffffffff';
+my $int64-basic-le = 'd84f588800000000000000800100000000000080fffffffffeffffff'
+                   ~ '00000000ffffffff01000000ffffffffffffff7fffffffff'
+                   ~ '00000080ffffffff01000080ffffffff0000000000000000'
+                   ~ 'feffff7f00000000ffffff7f000000000000008000000000'
+                   ~ 'feffffff00000000ffffffff000000000000000001000000'
+                   ~ 'feffffffffffff7fffffffffffffff7f';
+decodes-to $int64-basic, $_ for $int64-basic-be, $int64-basic-le;
+
+# XXXX: Rakudo only handles 63-bit native uints properly, not full 64-bit natives
+my $uint64-basic = array[uint64].new(0, 2147483646, 2147483647, 2147483648,
+                                     4294967294, 4294967295, 4294967296,
+                                     9223372036854775806, 9223372036854775807);
+                                   # 9223372036854775808, 18446744073709551614,
+                                   # 18446744073709551615);
+my $uint-basic   = array[uint  ].new(0, 2147483646, 2147483647, 2147483648,
+                                     4294967294, 4294967295, 4294967296,
+                                     9223372036854775806, 9223372036854775807);
+                                   # 9223372036854775808, 18446744073709551614,
+                                   # 18446744073709551615);
+my $uint64-basic-be = 'd84358480000000000000000000000007ffffffe000000007fffffff'
+                    ~ '000000008000000000000000fffffffe00000000ffffffff'
+                    ~ '00000001000000007ffffffffffffffe7fffffffffffffff';
+my $uint64-basic-le = 'd84758480000000000000000feffff7f00000000ffffff7f00000000'
+                    ~ '0000008000000000feffffff00000000ffffffff00000000'
+                    ~ '0000000001000000feffffffffffff7fffffffffffffff7f';
+decodes-to $uint64-basic, $_ for $uint64-basic-be, $uint64-basic-le;
 
 
 # int32/uint32
@@ -120,8 +167,12 @@ if Kernel.endian == BigEndian {
 
     encodes-to $int16-basic,       $int16-basic-be;
     encodes-to $int32-basic,       $int32-basic-be;
+    encodes-to $int64-basic,       $int64-basic-be;
+    encodes-to $int-basic,         $int64-basic-be;
     encodes-to $uint16-basic,      $uint16-basic-be;
     encodes-to $uint32-basic,      $uint32-basic-be;
+    encodes-to $uint64-basic,      $uint64-basic-be;
+    encodes-to $uint-basic,        $uint64-basic-be;
 }
 # LittleEndian Kernel
 else {
@@ -134,8 +185,12 @@ else {
 
     encodes-to $int16-basic,       $int16-basic-le;
     encodes-to $int32-basic,       $int32-basic-le;
+    encodes-to $int64-basic,       $int64-basic-le;
+    encodes-to $int-basic,         $int64-basic-le;
     encodes-to $uint16-basic,      $uint16-basic-le;
     encodes-to $uint32-basic,      $uint32-basic-le;
+    encodes-to $uint64-basic,      $uint64-basic-le;
+    encodes-to $uint-basic,        $uint64-basic-le;
 }
 
 
