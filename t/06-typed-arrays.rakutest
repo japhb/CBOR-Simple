@@ -5,7 +5,7 @@ use CodecMatches;
 use CBOR::Simple;
 
 
-plan 22;
+plan 28;
 
 
 ### Tests for RFC 8746 typed arrays (https://www.rfc-editor.org/rfc/rfc8746.html)
@@ -38,6 +38,41 @@ my $num64-basic-le = 'd8565838000000000000f07f000000000000f0ff'
                    ~ '000000000000f87f00000000000000000000000000000080'
                    ~ '9a9999999999f13f9c7500883ce4377e';
 decodes-to $num64-basic, $_ for $num64-basic-be, $num64-basic-le;
+
+
+# int32/uint32
+my $int32-basic    = array[int32].new(-2147483648, -2147483647, -65537, -65536,
+                                      -65535, -32769, -32768, -32767, -256,
+                                      -255, -254, -129, -128, -127, -1, 0, 1,
+                                      126, 127, 128, 129, 254, 255, 256, 32766,
+                                      32767, 32768, 32769, 65534, 65535, 65536,
+                                      65537, 2147483646, 2147483647);
+my $int32-basic-be = 'd84a58888000000080000001fffeffffffff0000ffff0001ffff7fff'
+                   ~ 'ffff8000ffff8001ffffff00ffffff01ffffff02ffffff7fffffff80'
+                   ~ 'ffffff81ffffffff00000000000000010000007e0000007f00000080'
+                   ~ '00000081000000fe000000ff0000010000007ffe00007fff00008000'
+                   ~ '000080010000fffe0000ffff00010000000100017ffffffe7fffffff';
+my $int32-basic-le = 'd84e58880000008001000080fffffeff0000ffff0100ffffff7fffff'
+                   ~ '0080ffff0180ffff00ffffff01ffffff02ffffff7fffffff80ffffff'
+                   ~ '81ffffffffffffff00000000010000007e0000007f00000080000000'
+                   ~ '81000000fe000000ff00000000010000fe7f0000ff7f000000800000'
+                   ~ '01800000feff0000ffff00000000010001000100feffff7fffffff7f';
+decodes-to $int32-basic, $_ for $int32-basic-be, $int32-basic-le;
+
+my $uint32-basic    = array[uint32].new(0, 1, 126, 127, 128, 129, 254, 255,
+                                        256, 32766, 32767, 32768, 32769, 65534,
+                                        65535, 65536, 65537, 2147483647,
+                                        2147483648, 2147483649, 4294967294,
+                                        4294967295);
+my $uint32-basic-be = 'd842585800000000000000010000007e0000007f0000008000000081'
+                    ~ '000000fe000000ff0000010000007ffe00007fff0000800000008001'
+                    ~ '0000fffe0000ffff00010000000100017fffffff8000000080000001'
+                    ~ 'fffffffeffffffff';
+my $uint32-basic-le = 'd846585800000000010000007e0000007f0000008000000081000000'
+                    ~ 'fe000000ff00000000010000fe7f0000ff7f00000080000001800000'
+                    ~ 'feff0000ffff00000000010001000100ffffff7f0000008001000080'
+                    ~ 'feffffffffffffff';
+decodes-to $uint32-basic, $_ for $uint32-basic-be, $uint32-basic-le;
 
 
 # int16/uint16
@@ -84,7 +119,9 @@ if Kernel.endian == BigEndian {
     encodes-to $num-basic,         $num64-basic-be;
 
     encodes-to $int16-basic,       $int16-basic-be;
+    encodes-to $int32-basic,       $int32-basic-be;
     encodes-to $uint16-basic,      $uint16-basic-be;
+    encodes-to $uint32-basic,      $uint32-basic-be;
 }
 # LittleEndian Kernel
 else {
@@ -96,7 +133,9 @@ else {
     encodes-to $num-basic,         $num64-basic-le;
 
     encodes-to $int16-basic,       $int16-basic-le;
+    encodes-to $int32-basic,       $int32-basic-le;
     encodes-to $uint16-basic,      $uint16-basic-le;
+    encodes-to $uint32-basic,      $uint32-basic-le;
 }
 
 
