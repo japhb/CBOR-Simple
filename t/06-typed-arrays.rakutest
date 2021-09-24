@@ -5,7 +5,7 @@ use CodecMatches;
 use CBOR::Simple;
 
 
-plan 16;
+plan 22;
 
 
 ### Tests for RFC 8746 typed arrays (https://www.rfc-editor.org/rfc/rfc8746.html)
@@ -14,6 +14,7 @@ plan 16;
 # DECODE BOTH BIG AND LITTLE ENDIAN ON ANY HOST
 # diag "Testing bi-endian decoding";
 
+# num32/num64/num
 my $num32-empty-be = 'd85140';
 my $num32-empty-le = 'd85540';
 my $num64-empty-be = 'd85240';
@@ -39,8 +40,28 @@ my $num64-basic-le = 'd8565838000000000000f07f000000000000f0ff'
 decodes-to $num64-basic, $_ for $num64-basic-be, $num64-basic-le;
 
 
+# int16/uint16
+my $int16-basic    = array[int16].new(-32768, -32767, -256, -255, -254, -129,
+                                      -128, -127, -1, 0, 1, 126, 127, 128, 129,
+                                      254, 255, 256, 32766, 32767);
+my $int16-basic-be = 'd849582880008001ff00ff01ff02ff7fff80ff81ffff00000001007e'
+                   ~ '007f0080008100fe00ff01007ffe7fff';
+my $int16-basic-le = 'd84d58280080018000ff01ff02ff7fff80ff81ffffff000001007e00'
+                   ~ '7f0080008100fe00ff000001fe7fff7f';
+decodes-to $int16-basic, $_ for $int16-basic-be, $int16-basic-le;
+
+my $uint16-basic    = array[uint16].new(0, 1, 126, 127, 128, 129, 254, 255,
+                                        256, 32766, 32767, 32768, 65534, 65535);
+my $uint16-basic-be = 'd841581c00000001007e007f0080008100fe00ff'
+                    ~ '01007ffe7fff8000fffeffff';
+my $uint16-basic-le = 'd845581c000001007e007f0080008100fe00ff00'
+                    ~ '0001fe7fff7f0080feffffff';
+decodes-to $uint16-basic, $_ for $uint16-basic-be, $uint16-basic-le;
+
+
 # TEST 8-BIT ENDIAN-AGNOSTIC ARRAYS
 
+# int8/uint8/byte
 my $uint8-basic    = array[uint8].new(0, 1, 126, 127, 128, 129, 254, 255);
 my $byte-basic     = array[byte ].new(0, 1, 126, 127, 128, 129, 254, 255);
 my $int8-basic     = array[int8 ].new(-128, -127, -1, 0, 1, 42, 126, 127);
@@ -61,6 +82,9 @@ if Kernel.endian == BigEndian {
     encodes-to $num32-basic,       $num32-basic-be;
     encodes-to $num64-basic,       $num64-basic-be;
     encodes-to $num-basic,         $num64-basic-be;
+
+    encodes-to $int16-basic,       $int16-basic-be;
+    encodes-to $uint16-basic,      $uint16-basic-be;
 }
 # LittleEndian Kernel
 else {
@@ -70,6 +94,9 @@ else {
     encodes-to $num32-basic,       $num32-basic-le;
     encodes-to $num64-basic,       $num64-basic-le;
     encodes-to $num-basic,         $num64-basic-le;
+
+    encodes-to $int16-basic,       $int16-basic-le;
+    encodes-to $uint16-basic,      $uint16-basic-le;
 }
 
 
