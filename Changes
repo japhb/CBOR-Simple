@@ -2,9 +2,18 @@ Revision history for CBOR-Simple
 
 0.1.1  *WIP*
   [Tags]
-  - Support Capture round-tripping, using new tag 99 (for which this module is
-    the reference implementation!); for more details see:
+  - Support Capture round-tripping using new tag (for which this module is the
+    reference implementation!).  Note that the tag number used (99) must be
+    considered EXPERIMENTAL until the spec has been ratified, so do not consider
+    serializations using this tag to be long-term durable.  For more details see:
     https://github.com/japhb/cbor-specs/blob/main/capture.md
+  - Refactor typed array packing for less needless repetition
+  - Support int and uint packed native arrays (RFC 8746 tags 64-79)
+
+  [Tests]
+  - Factored test helpers out into a common test library
+  - Rearranged tests for easier maintenance
+  - Test all implemented native array subtags of RFC 8746 (typed arrays)
 
 
 0.1.0  2021-09-09
