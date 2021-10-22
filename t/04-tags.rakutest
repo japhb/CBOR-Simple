@@ -5,7 +5,7 @@ use CodecMatches;
 use CBOR::Simple;
 
 
-plan 38;
+plan 39;
 
 
 # TAGGED VALUES
@@ -55,19 +55,6 @@ my @with-nils = ['foo', 1, 2, 'bar'];
 encodes-to @with-nils, '8463666f6fd81ff7d81ff763626172';
 decodes-to ['foo', Mu, Mu, 'bar'], '8463666f6ff7f763626172';
 
-# Extension tag 99: Capture
-# Tests from https://github.com/japhb/cbor-specs/blob/main/capture.md#examples
-matches \(1, 3),                 'd86382820103a0';
-matches \(6, 9, -4),             'd8638283060923a0';
-matches \(0, 2, :normalize),     'd86382820002a1696e6f726d616c697a65f5';
-matches \(1, 2, 3, :!normalize), 'd8638283010203a1696e6f726d616c697a65f4';
-
-matches    \(name => "Diwali", year => 2018),
-           'd8638280a2646e616d6566446977616c6964796561721907e2';
-
-decodes-to \(name => "Diwali", year => 2018),
-           'd8638280d90113a2646e616d6566446977616c6964796561721907e2';
-
 # Extension tag 258: Set
 matches (1, 2, 3).Set, 'd9010283010203';
 matches < a b c >.Set, 'd9010283616161626163';
@@ -86,6 +73,21 @@ is $decoded.AT-KEY(1942), 'v1', "has numeric key";
 is $decoded.AT-KEY('k2'), 'v2', "has string key";
 my $first = $decoded.keys.first(* eqv [1, 2, 3]);
 is $decoded.AT-KEY($first), 'v3', "has array key";
+
+# Extension tag 25441: Capture
+# Tests from https://github.com/japhb/cbor-specs/blob/main/capture.md#examples
+matches \(),                     'd9636180';
+matches \(1, 3),                 'd9636181820103';
+matches \(6, 9, -4),             'd963618183060923';
+matches \(0, 2, :normalize),     'd9636182820002a1696e6f726d616c697a65f5';
+matches \(1, 2, 3, :!normalize), 'd963618283010203a1696e6f726d616c697a65f4';
+
+matches    \(name => "Diwali", year => 2018),
+           'd9636181a2646e616d6566446977616c6964796561721907e2';
+
+decodes-to \(name => "Diwali", year => 2018),
+           'd9636181d90113a2646e616d6566446977616c6964796561721907e2';
+
 
 # Tag 55799: Self-describing CBOR
 decodes-to 100, 'd9d9f71864';

@@ -19,11 +19,11 @@ malformed($_, "Tag 24 requires byte string content") for
 malformed($_, "Tag 63 requires byte string content") for
     < d83f0a d83f2a d83f6141 d83f820102 d83fa0 d83fd83f4103 d83ff7 >;
 
-malformed($_, "Tag 99 requires an array containing an array followed by a map") for
-    < d863a201020304 d86382a10102a10304 d863828080 d86382a0816161 >;
-
 malformed($_, "Tag 275 requires only string keys") for
     < d90109a201020304 d90109a26131020304 >;
+
+malformed($_, "Tag 25441 requires an array containing an optional array followed by an optional map") for
+    < d96361a201020304 d9636182a10102a10304 d96361828080 d9636182a0816161 >;
 
 
 done-testing;

@@ -82,8 +82,8 @@ enum CBORTagNumber (
     # 80..87 Supported as a block
     # 88..95 unassigned
     # 96..98 NYI
+    # 99     unassigned
 
-    CBOR_Tag_Capture           => 99,  # This is the reference implementation!
     CBOR_Tag_Date_Integer      => 100,
 
     CBOR_Tag_Set               => 258,
@@ -92,6 +92,7 @@ enum CBORTagNumber (
     CBOR_Tag_Bigfloat_Extended => 265,
     CBOR_Tag_String_Key_Map    => 275,
     CBOR_Tag_Date_String       => 1004,
+    CBOR_Tag_Capture           => 25441,  # This is the reference implementation!
     CBOR_Tag_Self_Described    => 55799,
     CBOR_Tag_Self_Sequence     => 55800,
 
@@ -358,7 +359,12 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             }
             elsif nqp::istype($_, Capture) {
                 write-uint(CBOR_Tag, CBOR_Tag_Capture);
-                encode([.list, .hash]);
+                my $list := .list;
+                my $hash := .hash;
+
+                # Use preferred serialization, skipping empty children
+                encode($list ?? ($hash ?? [$list, $hash] !! [$list,])
+                             !! ($hash ?? [$hash,]       !! []      ));
             }
             # XXXX: Seq/Iterator?
             elsif nqp::istype($_, Positional) {
@@ -1026,22 +1032,45 @@ multi cbor-decode(Blob:D $cbor, Int:D $pos is rw, Bool:D :$breakable = False) is
             +^$value
         }
         elsif $tag-number == CBOR_Tag_Capture {
-            fail-malformed "Capture tag ($tag-number) does not contain an array with exactly two elements"
-                unless nqp::readuint($cbor, $pos++, $ne8) == CBOR_Array + 2;
+            my $capture_top = nqp::readuint($cbor, $pos++, $ne8);
 
-            my $list := decode;
-            my $hash := decode;
-               $hash := $hash.value
-                     if nqp::istype($hash, Tagged)
-                     && (   $hash.tag-number == CBOR_Tag_Object_Key_Map
-                         || $hash.tag-number == CBOR_Tag_String_Key_Map);
+            if    $capture_top == CBOR_Array {
+                Capture.new()
+            }
+            elsif $capture_top == CBOR_Array + 1 {
+                my $child := decode;
+                $child := $child.value
+                       if nqp::istype($child, Tagged)
+                       && (   $child.tag-number == CBOR_Tag_Object_Key_Map
+                           || $child.tag-number == CBOR_Tag_String_Key_Map);
+                if nqp::istype($child, Array) {
+                    Capture.new(:list($child))
+                }
+                elsif nqp::istype($child, Map) {
+                    Capture.new(:hash($child))
+                }
+                else {
+                    fail-malformed "Capture tag ($tag-number) array's child is neither an array nor a map";
+                }
+            }
+            elsif $capture_top == CBOR_Array + 2 {
+                my $list := decode;
+                my $hash := decode;
+                   $hash := $hash.value
+                         if nqp::istype($hash, Tagged)
+                         && (   $hash.tag-number == CBOR_Tag_Object_Key_Map
+                             || $hash.tag-number == CBOR_Tag_String_Key_Map);
 
-            fail-malformed "Capture tag ($tag-number) array's first element is not an array"
-                unless nqp::istype($list, Array);
-            fail-malformed "Capture tag ($tag-number) array's second element is not a map"
-                unless nqp::istype($hash, Map);
+                fail-malformed "Capture tag ($tag-number) array's first element is not an array"
+                    unless nqp::istype($list, Array);
+                fail-malformed "Capture tag ($tag-number) array's second element is not a map"
+                    unless nqp::istype($hash, Map);
 
-            Capture.new(:$list, :$hash)
+                Capture.new(:$list, :$hash)
+            }
+            else {
+                fail-malformed "Capture tag ($tag-number) does not contain an array with at most two elements";
+            }
         }
         elsif $tag-number == CBOR_Tag_Set {
             fail-malformed "Set tag (258) does not contain an array"
@@ -1608,7 +1637,9 @@ rather than this default behavior.
     RFC 8746     |        1040 | ✘      | ✘      | Column-major multidim array
     unassigned   |  1041-22097 |        |        |
     [Lehmann]    |       22098 | ✘      | ✘      | Hint for additional indirection
-    unassigned   | 22099-49999 |        |        |
+    unassigned   | 22099-25440 |        |        |
+    [Broadwell]  | 25441       | ✓      | ✓      | Capture: reference implementation
+    unassigned   | 25442-49999 |        |        |
     [Tongzhou]   | 50000-50011 | ✘✘     | ✘✘     | PlatformV
     unassigned   | 50012-55798 |        |        |
     RFC 8949     |       55799 | ✓      | ✓      | Self-described CBOR
