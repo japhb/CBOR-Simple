@@ -1524,7 +1524,7 @@ certain tag extensions improve this), so the following mappings apply:
       SYNOPSIS with `:tag-number(24)` (encoded CBOR value) or
       `:tag-number(63)` (encoded CBOR Sequence).
 
-=item CBOR strings claiming to be longer than C<2⁶‭³‭-1> are treated as malformed.
+=item CBOR strings claiming to be longer than C<2⁶³-1> are treated as malformed.
 
 =item Bigfloats and decimal fractions (tags 4, 5, 264, 265) with very large
       exponents may result in numeric overflow when decoded.
