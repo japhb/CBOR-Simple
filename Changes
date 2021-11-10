@@ -1,6 +1,6 @@
 Revision history for CBOR-Simple
 
-0.1.1  *WIP*
+0.1.1  2021-11-09
   [Docs]
   - Remove Unicode BiDi control characters that had slipped into the docs with
     a copy/paste
