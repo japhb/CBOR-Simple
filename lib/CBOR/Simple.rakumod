@@ -369,6 +369,8 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
             # XXXX: Seq/Iterator?
             elsif nqp::istype($_, Positional) {
                 constant $endian    = Kernel.endian == LittleEndian ?? 4 !! 0;
+                constant $nan-fix   = (buf8.new.write-num64(0, NaN, BigEndian)
+                                       .read-uint8(0)) +& 0x80;
                 constant %type-info =
                     #          TAG         SHIFT  BYTES  CONSTANT
                     byte   => (0x40,           0, 1, nqp::const::BINARY_SIZE_8_BIT),
@@ -410,13 +412,36 @@ multi cbor-encode(Mu $value, Int:D $pos is rw, Buf:D $buf = buf8.new) is export 
 
                         # num* types
                         if $tag >= 0x50 {
-                            nqp::while(
-                                nqp::islt_i(($i = nqp::add_i($i, 1)), $elems),
-                                nqp::writenum($buf,
-                                              nqp::add_i($p, nqp::bitshiftl_i($i, $s)),
-                                              nqp::atpos_n($array, $i),
-                                              $t)
-                            );
+                            # Slow(er) path for systems with signed NaN
+                            if $nan-fix {
+                                my int $sign-offset = $endian ?? $type-info[2] - 1 !! 0;
+                                nqp::while(
+                                    nqp::islt_i(($i = nqp::add_i($i, 1)), $elems),
+                                    nqp::stmts(
+                                        (my int $l = nqp::add_i($p, nqp::bitshiftl_i($i, $s))),
+                                        (my num $n = nqp::atpos_n($array, $i)),
+                                        (nqp::writenum($buf, $l, $n, $t)),
+                                        # Only do sign fix for NaN (!= self)
+                                        (nqp::if(nqp::isne_n($n, $n),
+                                                 nqp::stmts(
+                                                     (my int $sl = nqp::add_i($l, $sign-offset)),
+                                                     (nqp::writeuint($buf, $sl,
+                                                                     nqp::readuint($buf, $sl, $ne8) +& 0x7F, $ne8)),
+                                                 ))
+                                        ),
+                                    )
+                                );
+                            }
+                            # Fast path for systems that don't need NaN fix
+                            else {
+                                nqp::while(
+                                    nqp::islt_i(($i = nqp::add_i($i, 1)), $elems),
+                                    nqp::writenum($buf,
+                                                  nqp::add_i($p, nqp::bitshiftl_i($i, $s)),
+                                                  nqp::atpos_n($array, $i),
+                                                  $t)
+                                );
+                            }
                         }
                         # (signed) int* types
                         elsif $tag >= 0x48 {
