@@ -1,4 +1,4 @@
-unit module CBOR::Simple:auth<zef:japhb>:api<0>:ver<0.1.1>;
+unit module CBOR::Simple:auth<zef:japhb>:api<0>:ver<0.1.2>;
 
 use nqp;
 use TinyFloats;

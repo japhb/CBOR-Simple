@@ -1,6 +1,8 @@
 Revision history for CBOR-Simple
 
 {{$NEXT}}
+
+0.1.2  2022-04-18T12:16:05-07:00
   [Bug Fix]
   - Fix encoding of NaNs in packed numeric arrays on platforms with signed NaN
     (originally reported on Windows); this already worked for all other variants
