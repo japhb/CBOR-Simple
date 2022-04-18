@@ -1,5 +1,11 @@
 Revision history for CBOR-Simple
 
+{{$NEXT}}
+  [Bug Fix]
+  - Fix encoding of NaNs in packed numeric arrays on platforms with signed NaN
+    (originally reported on Windows); this already worked for all other variants
+
+
 0.1.1  2021-11-09
   [Docs]
   - Remove Unicode BiDi control characters that had slipped into the docs with
