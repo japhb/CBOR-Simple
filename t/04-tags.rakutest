@@ -53,7 +53,15 @@ matches FatRat.new(-18446744073709551615, 18446744073709551616),
 my @with-nils = ['foo', 1, 2, 'bar'];
 @with-nils.BIND-POS($_, Nil) for 1..2;
 encodes-to @with-nils, '8463666f6fd81ff7d81ff763626172';
-decodes-to ['foo', Mu, Mu, 'bar'], '8463666f6ff7f763626172';
+
+my $compiler   = $*RAKU.compiler;
+my $can-eqv-Mu = $compiler.name eq 'rakudo' && $compiler.version >= v2021.06;
+if $can-eqv-Mu {
+    decodes-to ['foo', Mu, Mu, 'bar'], '8463666f6ff7f763626172';
+}
+else {
+    skip "Cannot run absent values test due to old compiler; requires Rakudo v2021.06 minimum";
+}
 
 # Extension tag 258: Set
 matches (1, 2, 3).Set, 'd9010283010203';
