@@ -18,6 +18,10 @@ jobs:
           - windows-latest
         raku-version:
           - 'latest'
+          - '2022.02'
+          - '2021.04'
+          - '2020.12'
+          - '2020.07'
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
