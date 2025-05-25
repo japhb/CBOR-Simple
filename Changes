@@ -1,6 +1,14 @@
 Revision history for CBOR-Simple
 
 {{$NEXT}}
+  [Docs]
+  - Fix out of date docs for packed int support (it's been there for a while,
+    but the README still said it wasn't).
+
+  [Packaging]
+  - Stop trying to CI against now-ancient Rakudos.
+  - Fix CI badge link in dist.ini
+
 
 0.1.3  2022-07-31T17:16:36-07:00
   [Tests]
