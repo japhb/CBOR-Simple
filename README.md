@@ -1,4 +1,4 @@
-[![Actions Status](https://github.com/japhb/CBOR-Simple/workflows/test/badge.svg)](https://github.com/japhb/CBOR-Simple/actions)
+[![Actions Status](https://github.com/japhb/CBOR-Simple/actions/workflows/test.yml/badge.svg)](https://github.com/japhb/CBOR-Simple/actions)
 
 NAME
 ====

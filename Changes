@@ -1,6 +1,8 @@
 Revision history for CBOR-Simple
 
 {{$NEXT}}
+
+0.1.4  2025-05-24T22:58:45-07:00
   [Docs]
   - Fix out of date docs for packed int support (it's been there for a while,
     but the README still said it wasn't).
