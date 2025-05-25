@@ -1574,7 +1574,7 @@ rather than this default behavior.
     Collections    | Good    | Sets, maps with only object or only string keys
     Graph          | NONE    | Cyclic, indirected, and self-referential structures
     Numbers        | Good    | Rational/BigInt/BigFloat support except non-finite triplets
-    Packed Arrays  | Partial | Packed num16/32/64 arrays supported; packed int arrays not
+    Packed Arrays  | Partial | Packed num32/64, [u]int* arrays full; num16 is read-only
     Special Arrays | NONE    | Explicit multi-dim/homogenous arrays
     Tag Fallbacks  | Good    | Round tripping of unknown tagged content
     Date/Time      | Partial | All but tagged time (tags 1001-1003) supported
@@ -1627,8 +1627,8 @@ rather than this default behavior.
     RFC 8392     |          61 | ✘      | ✘      | CBOR Web Token (CWT)
     unassigned   |          62 |        |        |
     [Bormann]    |          63 | T      | ✓      | Encoded CBOR Sequence
-    RFC 8746     |       64-79 | ✘!     | ✘!     | Packed int arrays
-    RFC 8746     |       80-87 | ✓      | ✓      | Packed num arrays (except 128-bit)
+    RFC 8746     |       64-79 | ✓      | ✓      | Packed int arrays
+    RFC 8746     |       80-87 | *      | ✓      | Packed num arrays (except 128-bit)
     unassigned   |       88-95 |        |        |
     COSE         |       96-98 | ✘      | ✘      | Encryption/MAC/Signatures
     unassigned   |          99 |        |        |
@@ -1685,7 +1685,7 @@ rather than this default behavior.
     SYMBOL | MEANING
     =======|========
     ✓      | Fully supported
-    *      | Supported, but see notes below
+    *      | Supported, but see notes above
     T      | Encoding supported by explicitly tagging contents
     →      | Raku values will be encoded using a different tag
     D      | Deprecated and unsupported tag spec; may eventually be decodable
@@ -1703,7 +1703,7 @@ Geoffrey Broadwell <gjb@sonic.net>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2021 Geoffrey Broadwell
+Copyright 2021,2025 Geoffrey Broadwell
 
 This library is free software; you can redistribute it and/or modify it under
 the Artistic License 2.0.
